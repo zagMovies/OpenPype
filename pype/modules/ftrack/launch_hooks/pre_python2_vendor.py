@@ -3,7 +3,7 @@ from pype.lib import PreLaunchHook
 from pype.modules.ftrack import FTRACK_MODULE_DIR
 
 
-class PrePyhton2Support(PreLaunchHook):
+class PrePython2Support(PreLaunchHook):
     """Add python ftrack api module for Python 2 to PYTHONPATH.
 
     Path to vendor modules is added to the beggining of PYTHONPATH.
