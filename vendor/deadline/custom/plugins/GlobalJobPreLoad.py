@@ -75,7 +75,7 @@ def inject_pype_environment(deadlinePlugin):
         with open(export_url) as fp:
             contents = json.load(fp)
             for key, value in contents.items():
-                deadlinePlugin.SetEnvironmentVariable(key, value)
+                deadlinePlugin.SetProcessEnvironmentVariable(key, value)
 
         os.remove(export_url)
 
