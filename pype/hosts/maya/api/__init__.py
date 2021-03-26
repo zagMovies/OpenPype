@@ -151,6 +151,7 @@ def on_open(_):
     # ensure it is using correct FPS for the asset
     lib.validate_fps()
     lib.fix_incompatible_containers()
+    lib.fix_incompatible_instances()
 
     if any_outdated():
         log.warning("Scene has outdated content.")
