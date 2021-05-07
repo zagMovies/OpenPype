@@ -100,6 +100,14 @@ hash = "fd2e00278e01e85dcee7b4a6969d1a16f13016ec16700fb0366dbb1b1f3c37ad"
 url = "https://distribute.openpype.io/thirdparty/oiio-2.2.0-linux.tgz"
 hash = "sha256:..."
 
-[openpype.thirdparty.oiio.darwin]
+[openpype.thirdparty.usd.darwin]
 url = "https://distribute.openpype.io/thirdparty/oiio-2.2.0-darwin.tgz"
 hash = "sha256:..."
+
+[openpype.thirdparty.usd.windows]
+url = "https://distribute.openpype.io/thirdparty/usd-21-05-usd-win64_py36_release.zip"
+hash = "B9628EE9FF4785A11A3D858517E09F58AB56D642E9B985B196E8882EBEDB3E53"
+
+[openpype.thirdparty.usd.linux]
+url = "https://distribute.openpype.io/thirdparty/usd-21-05-usd-linux64_py36-centos_release.zip"
+hash = "C02FE24051B2A2F18B4FC5D41F98660A86AC8C18F9504AB65E3536B7EF382C64"
