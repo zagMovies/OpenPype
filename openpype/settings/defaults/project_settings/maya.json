@@ -1,4 +1,5 @@
 {
+    "compress": true,
     "ext_mapping": {
         "model": "ma",
         "mayaAscii": "ma",
@@ -7,7 +8,6 @@
         "workfile": "ma",
         "yetiRig": "ma"
     },
-    "compress": true,
     "maya-dirmap": {
         "enabled": true,
         "paths": {
