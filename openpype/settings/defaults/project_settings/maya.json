@@ -1,6 +1,6 @@
 {
-    "compress": true,
     "ext_mapping": {
+        "compress": true,
         "model": "ma",
         "mayaAscii": "ma",
         "camera": "ma",

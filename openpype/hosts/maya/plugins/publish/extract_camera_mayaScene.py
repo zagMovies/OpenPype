@@ -118,6 +118,14 @@ class ExtractCameraMayaScene(openpype.api.Extractor):
                     # no preset found
                     pass
 
+        # compress type boolean
+        compress = (
+            instance.context.data["project_settings"]["maya"]["ext_mapping"]["compress"]
+        )
+        if compress:
+            self.log.info("Looking in settings is MayaAscii comprees or not ...")
+            self.compress = compress["enabled"]
+
         framerange = [instance.data.get("frameStart", 1),
                       instance.data.get("frameEnd", 1)]
         handle_start = instance.data.get("handleStart", 0)
@@ -197,7 +205,8 @@ class ExtractCameraMayaScene(openpype.api.Extractor):
                               channels=True,  # allow animation
                               constraints=False,
                               shader=False,
-                              expressions=False)
+                              expressions=False,
+                              compress=self.compress)
 
                     # Delete the baked hierarchy
                     if bake_to_worldspace:

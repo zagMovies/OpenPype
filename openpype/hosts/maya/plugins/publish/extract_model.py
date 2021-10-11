@@ -47,6 +47,15 @@ class ExtractModel(openpype.api.Extractor):
                 except KeyError:
                     # no preset found
                     pass
+
+        # compress type boolean
+        compress = (
+            instance.context.data["project_settings"]["maya"]["ext_mapping"]["compress"]
+        )
+        if compress:
+            self.log.info("Looking in settings is MayaAscii comprees or not ...")
+            self.compress = compress["enabled"]
+
         # Define extract output file path
         stagingdir = self.staging_dir(instance)
         filename = "{0}.{1}".format(instance.name, self.scene_type)
@@ -84,7 +93,8 @@ class ExtractModel(openpype.api.Extractor):
                                   channels=False,
                                   constraints=False,
                                   expressions=False,
-                                  constructionHistory=False)
+                                  constructionHistory=False,
+                                  compress=self.compress)
 
                         # Store reference for integration
 

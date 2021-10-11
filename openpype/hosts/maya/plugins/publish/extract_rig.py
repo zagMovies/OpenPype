@@ -33,6 +33,15 @@ class ExtractRig(openpype.api.Extractor):
                 except AttributeError:
                     # no preset found
                     pass
+
+        # compress type boolean
+        compress = (
+            instance.context.data["project_settings"]["maya"]["ext_mapping"]["compress"]
+        )
+        if compress:
+            self.log.info("Looking in settings is MayaAscii comprees or not ...")
+            self.compress = compress["enabled"]
+            
         # Define extract output file path
         dir_path = self.staging_dir(instance)
         filename = "{0}.{1}".format(instance.name, self.scene_type)
@@ -50,7 +59,8 @@ class ExtractRig(openpype.api.Extractor):
                       channels=True,
                       constraints=True,
                       expressions=True,
-                      constructionHistory=True)
+                      constructionHistory=True,
+                      compress=self.compress)
 
         if "representations" not in instance.data:
             instance.data["representations"] = []

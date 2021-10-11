@@ -153,6 +153,27 @@ class ExtractLook(openpype.api.Extractor):
             renderer = "renderman"
         return renderer
 
+    def get_maya_scene_compress(self, instance):
+        """Get Maya scene compress from settings.
+
+        Args:
+            instance (pyblish.api.Instance): Instance with collected
+                project settings.
+
+        """
+
+        # compress type boolean
+        compress = (
+            instance.context.data["project_settings"]["maya"]["ext_mapping"]["compress"]
+        )
+        if compress:
+            self.log.info("Looking in settings is MayaAscii comprees or not ...")
+            self.compress = compress["enabled"]
+            return self.compress
+        else :    
+            return False
+
+        
     def get_maya_scene_type(self, instance):
         """Get Maya scene type from settings.
 
@@ -187,6 +208,7 @@ class ExtractLook(openpype.api.Extractor):
 
         """
         _scene_type = self.get_maya_scene_type(instance)
+        _scene_compress = self.get_maya_scene_compress(instance)
 
         # Define extract output file path
         dir_path = self.staging_dir(instance)
@@ -235,6 +257,7 @@ class ExtractLook(openpype.api.Extractor):
                                 constraints=True,
                                 expressions=True,
                                 constructionHistory=True,
+                                compress=_scene_compress,
                             )
 
         # Write the JSON data
