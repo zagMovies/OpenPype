@@ -164,7 +164,7 @@ class ExtractLook(openpype.api.Extractor):
 
         # compress type boolean
         compress = (
-            instance.context.data["project_settings"]["maya"]["ext_mapping"]["compress"]
+            instance.context.data["project_settings"]["maya"]["maya-filesetting"]["compress"]
         )
         if compress:
             self.log.info("Looking in settings is MayaAscii comprees or not ...")

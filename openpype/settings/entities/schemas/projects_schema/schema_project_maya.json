@@ -6,17 +6,24 @@
     "is_file": true,
     "children": [
         {
-            "type": "dict-modifiable",
-            "key": "ext_mapping",
-            "label": "Extension Mapping",
-            "use_label_wrap": true,
+            "type": "dict",
+            "collapsible": true,
+            "key": "maya-filesetting",
+            "label": "Maya File Setting",
+            "is_group": true,
             "children": [
                 {
                     "type": "boolean",
                     "key": "compress",
                     "label": "Maya Compress files"
                 }
-            ],
+            ]
+        },
+        {
+            "type": "dict-modifiable",
+            "key": "ext_mapping",
+            "label": "Extension Mapping",
+            "use_label_wrap": true,
             "object_type": {
                                 "type": "text"
                             }
