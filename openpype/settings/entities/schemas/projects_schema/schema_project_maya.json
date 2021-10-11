@@ -15,6 +15,11 @@
                             }
         },
         {
+            "type": "boolean",
+            "key": "compress",
+            "label": "Maya Compress files"
+        },
+        {
            "type": "dict",
             "collapsible": true,
             "checkbox_key": "enabled",

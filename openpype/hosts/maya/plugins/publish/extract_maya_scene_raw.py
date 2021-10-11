@@ -46,6 +46,14 @@ class ExtractMayaSceneRaw(openpype.api.Extractor):
         filename = "{0}.{1}".format(instance.name, self.scene_type)
         path = os.path.join(dir_path, filename)
 
+        # compress type boolean
+        compress = (
+            instance.context.data["project_settings"]["maya"]["compress"]
+        )
+        if compress:
+            self.log.info("Looking in settings is MayaAscii comprees or not ...")
+            self.compress = compress["enabled"]
+
         # Whether to include all nodes in the instance (including those from
         # history) or only use the exact set members
         members_only = instance.data.get("exactSetMembersOnly", False)
@@ -69,7 +77,8 @@ class ExtractMayaSceneRaw(openpype.api.Extractor):
                       constructionHistory=True,
                       shader=True,
                       constraints=True,
-                      expressions=True)
+                      expressions=True,
+                      compress=self.compress)
 
         if "representations" not in instance.data:
             instance.data["representations"] = []

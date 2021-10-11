@@ -7,6 +7,7 @@
         "workfile": "ma",
         "yetiRig": "ma"
     },
+    "compress": true,
     "maya-dirmap": {
         "enabled": true,
         "paths": {
