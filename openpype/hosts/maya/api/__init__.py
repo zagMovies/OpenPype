@@ -2,7 +2,7 @@ import os
 import logging
 import weakref
 
-from maya import utils, cmds
+from maya import utils, cmds, mel
 
 from avalon import api as avalon
 from avalon import pipeline
@@ -198,6 +198,9 @@ def on_init(_):
 
     # Force load objExport plug-in (requested by artists)
     cmds.loadPlugin("objExport", quiet=True)
+
+    # Allow option to save Maya compress files 
+    mel.eval('translator -cmp "asCompressed";')
 
     from .customize import (
         override_component_mask_commands,
