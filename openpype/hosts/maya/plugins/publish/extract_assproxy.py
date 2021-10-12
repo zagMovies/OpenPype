@@ -38,7 +38,7 @@ class ExtractAssProxy(openpype.api.Extractor):
         )
         if compress:
             self.log.info("Looking in settings is MayaAscii comprees or not ...")
-            self.compress = compress["enabled"]
+            self.compress = compress
 
         # Define extract output file path
         stagingdir = self.staging_dir(instance)

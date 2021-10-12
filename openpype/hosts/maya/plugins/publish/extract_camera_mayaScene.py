@@ -124,7 +124,7 @@ class ExtractCameraMayaScene(openpype.api.Extractor):
         )
         if compress:
             self.log.info("Looking in settings is MayaAscii comprees or not ...")
-            self.compress = compress["enabled"]
+            self.compress = compress
 
         framerange = [instance.data.get("frameStart", 1),
                       instance.data.get("frameEnd", 1)]

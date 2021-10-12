@@ -168,7 +168,7 @@ class ExtractLook(openpype.api.Extractor):
         )
         if compress:
             self.log.info("Looking in settings is MayaAscii comprees or not ...")
-            self.compress = compress["enabled"]
+            self.compress = compress
             return self.compress
         else :    
             return False

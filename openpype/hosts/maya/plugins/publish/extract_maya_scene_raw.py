@@ -2,7 +2,7 @@
 """Extract data as Maya scene (raw)."""
 import os
 
-from maya import cmds
+from maya import cmds, mel
 
 import avalon.maya
 import openpype.api
@@ -52,7 +52,10 @@ class ExtractMayaSceneRaw(openpype.api.Extractor):
         )
         if compress:
             self.log.info("Looking in settings is MayaAscii comprees or not ...")
-            self.compress = compress["enabled"]
+            # Allow option to save Maya compress files 
+            mel.eval('translator -cmp "compressed";')
+        else :
+            mel.eval('translator -cmp "uncompressed";')
 
         # Whether to include all nodes in the instance (including those from
         # history) or only use the exact set members
@@ -77,8 +80,7 @@ class ExtractMayaSceneRaw(openpype.api.Extractor):
                       constructionHistory=True,
                       shader=True,
                       constraints=True,
-                      expressions=True,
-                      compress=self.compress)
+                      expressions=True)
 
         if "representations" not in instance.data:
             instance.data["representations"] = []
