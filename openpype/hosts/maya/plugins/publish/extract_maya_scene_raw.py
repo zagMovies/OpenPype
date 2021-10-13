@@ -41,10 +41,6 @@ class ExtractMayaSceneRaw(openpype.api.Extractor):
                 except KeyError:
                     # no preset found
                     pass
-        # Define extract output file path
-        dir_path = self.staging_dir(instance)
-        filename = "{0}.{1}".format(instance.name, self.scene_type)
-        path = os.path.join(dir_path, filename)
 
         # compress type boolean
         compress = (
@@ -54,8 +50,15 @@ class ExtractMayaSceneRaw(openpype.api.Extractor):
             self.log.info("Looking in settings is MayaAscii comprees or not ...")
             # Allow option to save Maya compress files 
             mel.eval('translator -cmp "compressed";')
+            self.scene_type += ".gz"
         else :
             mel.eval('translator -cmp "uncompressed";')
+            self.scene_type += ""
+
+        # Define extract output file path
+        dir_path = self.staging_dir(instance)
+        filename = "{0}.{1}".format(instance.name, self.scene_type )
+        path = os.path.join(dir_path, filename)
 
         # Whether to include all nodes in the instance (including those from
         # history) or only use the exact set members
@@ -74,7 +77,7 @@ class ExtractMayaSceneRaw(openpype.api.Extractor):
             cmds.select(members, noExpand=True)
             cmds.file(path,
                       force=True,
-                      typ="mayaAscii" if self.scene_type == "ma" else "mayaBinary",  # noqa: E501
+                      typ="mayaAscii" if self.scene_type in ["ma" , "ma.gz"] else "mayaBinary",  # noqa: E501
                       exportSelected=True,
                       preserveReferences=True,
                       constructionHistory=True,
