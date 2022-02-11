@@ -5,7 +5,7 @@ from avalon.vendor import qtawesome
 
 from openpype.tools.utils.views import DeselectableTreeView
 from .client import (
-    get_tasks_by_folder_id
+    get_tasks_by_folder_ids
 )
 
 
@@ -53,11 +53,8 @@ class TasksModel(QtGui.QStandardItemModel):
         # Get the project configured icons from database
         task_types = {}
         if self._context_is_valid():
-            project = self.dbcon.find_one(
-                {"type": "project"},
-                {"config.tasks"}
-            )
-            task_types = project["config"].get("tasks") or task_types
+            # TODO use connection to get task types
+            pass
         self._project_task_types = task_types
 
     def _try_get_awesome_icon(self, icon_name):
@@ -113,7 +110,7 @@ class TasksModel(QtGui.QStandardItemModel):
         tasks_info = None
         if self._context_is_valid():
             tasks_info = (
-                get_tasks_by_folder_id(self._context.project_name, folder_id)
+                get_tasks_by_folder_ids(self._context.project_name, folder_id)
             )
 
         self._set_folder_tasks(folder_id, tasks_info)

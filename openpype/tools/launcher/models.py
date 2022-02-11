@@ -1,6 +1,5 @@
 import re
 import uuid
-import copy
 import logging
 import collections
 import time
@@ -32,11 +31,7 @@ from .constants import (
     FORCE_NOT_OPEN_WORKFILE_ROLE
 )
 from .actions import ApplicationAction
-from .client import (
-    get_project_names,
-    get_project_folders,
-    get_project_tasks,
-)
+from .client import create_session
 
 log = logging.getLogger(__name__)
 
@@ -440,6 +435,8 @@ class LauncherModel(QtCore.QObject):
         # Folder refresh thread
         self._folders_refresh_thread = None
 
+        self._session = create_session()
+
     def _on_timeout(self):
         """Refresh timer timeout."""
         if self._active:
@@ -523,7 +520,16 @@ class LauncherModel(QtCore.QObject):
         return self._folders_by_id.get(folder_id)
 
     def get_tasks_by_folder_id(self, folder_id):
-        return self._tasks_by_folder_id.get(folder_id)
+        if not folder_id:
+            return None
+
+        if folder_id not in self._tasks_by_folder_id:
+            self._tasks_by_folder_id[folder_id] = (
+                self._session.get_tasks_by_folder_ids(
+                    self.project_name, folder_id
+                )
+            )
+        return self._tasks_by_folder_id[folder_id]
 
     def set_project_name(self, project_name):
         """Change project name and refresh folder documents."""
@@ -544,7 +550,7 @@ class LauncherModel(QtCore.QObject):
         current_project = self.project_name
         project_names = set()
 
-        for project_name in get_project_names():
+        for project_name in self._session.get_project_names():
             project_names.add(project_name)
 
         self._project_names = project_names
@@ -571,45 +577,15 @@ class LauncherModel(QtCore.QObject):
         for task_data in tasks_data:
             tasks_by_folder_id[task_data["folderId"]].append(task_data)
 
-        all_task_types = set()
-        all_assignees = set()
         folders_by_id = {}
-        folder_filter_data_by_id = {}
-        for folder_data in folders_data:
-            task_types = set()
-            assignees = set()
-            folder_id = folder_data["id"]
-            folders_by_id[folder_id] = folder_data
-            folder_tasks = tasks_by_folder_id[folder_id]
-            folder_filter_data_by_id[folder_id] = {
-                "assignees": assignees,
-                "task_types": task_types
-            }
-            if not folder_tasks:
-                continue
-
-            for task_data in folder_tasks:
-                task_assignees = set()
-                _task_assignees = task_data.get("assignees")
-                if _task_assignees:
-                    for assignee in _task_assignees:
-                        task_assignees.add(assignee["username"])
-
-                task_type = task_data.get("type")
-                if task_assignees:
-                    assignees |= set(task_assignees)
-                if task_type:
-                    task_types.add(task_type)
-
-            all_task_types |= task_types
-            all_assignees |= assignees
 
         self._folders_by_id = folders_by_id
         self._folders = folders_data
-        self._folder_filter_data_by_id = folder_filter_data_by_id
-        self._assignees = all_assignees
-        self._task_types = all_task_types
-        self._tasks_by_folder_id = tasks_by_folder_id
+        # NOTE disabled filtering options for now
+        self._folder_filter_data_by_id = {}
+        self._assignees = set()
+        self._task_types = set()
+        self._tasks_by_folder_id = {}
 
         self.folders_refreshed.emit()
 
@@ -673,15 +649,14 @@ class LauncherModel(QtCore.QObject):
             self._folders_refresh_thread = None
 
     def _refresh_folders(self):
-        folders_data = get_project_folders(self._context.project_name)
-        if not self._refreshing_folders:
-            return
-        task_data = get_project_tasks(self._context.project_name)
+        folders_data = self._session.get_project_folders(
+            self._context.project_name
+        )
         if not self._refreshing_folders:
             return
 
         self._refreshing_folders = False
-        self._set_project_hierarchy(folders_data, task_data)
+        self._set_project_hierarchy(folders_data)
 
 
 class LauncherTasksProxyModel(TasksProxyModel):
@@ -828,17 +803,17 @@ class LauncherFoldersModel(FoldersModel):
 
     def _fill_folders(self, *args, **kwargs):
         super(LauncherFoldersModel, self)._fill_folders(*args, **kwargs)
-        folder_filter_data_by_id = (
-            self._launcher_model.folder_filter_data_by_id
-        )
-        for folder_id, item in self._items_by_folder_id.items():
-            filter_data = folder_filter_data_by_id.get(folder_id)
-
-            assignees = filter_data["assignees"]
-            task_types = filter_data["task_types"]
-
-            item.setData(assignees, FOLDER_ASSIGNEE_ROLE)
-            item.setData(task_types, FOLDER_TASK_TYPES_ROLE)
+        # folder_filter_data_by_id = (
+        #     self._launcher_model.folder_filter_data_by_id
+        # )
+        # for folder_id, item in self._items_by_folder_id.items():
+        #     filter_data = folder_filter_data_by_id.get(folder_id)
+        #
+        #     assignees = filter_data["assignees"]
+        #     task_types = filter_data["task_types"]
+        #
+        #     item.setData(assignees, FOLDER_ASSIGNEE_ROLE)
+        #     item.setData(task_types, FOLDER_TASK_TYPES_ROLE)
 
     def _on_project_change(self):
         self._clear_items()

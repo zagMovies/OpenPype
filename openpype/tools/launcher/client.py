@@ -4,6 +4,20 @@ import logging
 import collections
 from http import HTTPStatus
 import requests
+import six
+
+
+class RequestType:
+    def __init__(self, name):
+        self.name = name
+
+
+class RequestTypes:
+    get = RequestType("GET")
+    post = RequestType("POST")
+    put = RequestType("PUT")
+    patch = RequestType("PATCH")
+    delete = RequestType("DELETE")
 
 
 class MissingEntityError(Exception):
@@ -93,9 +107,7 @@ def load_token():
     return ""
 
 
-
-
-class API(object):
+class APIBase(object):
     """
     Args:
         base_url(str): Example: http://localhost:5000
@@ -107,6 +119,13 @@ class API(object):
         self._graphl_url = "{}/graphql".format(base_url)
         self._log = None
         self._access_token = None
+        self._base_functions_mapping = {
+            RequestTypes.get: requests.get,
+            RequestTypes.post: requests.post,
+            RequestTypes.put: requests.put,
+            RequestTypes.patch: requests.patch,
+            RequestTypes.delete: requests.delete
+        }
 
     @property
     def log(self):
@@ -126,14 +145,14 @@ class API(object):
         if token:
             self._access_token = token
             response = self.get("users/me")
-            if response.status == 200:
+            if response.status == 200 and response.data["name"] == name:
                 return
+            self._access_token = None
             store_token("")
 
         response = self._do_rest_request(
-            requests.get,
-            self._rest_url,
-            headers=self.headers
+            RequestTypes.get,
+            self._rest_url
         )
         response = self.post(
             "auth/login",
@@ -153,9 +172,20 @@ class API(object):
         response = requests.post(
             self._graphl_url, json=data, headers=self.headers
         )
+        self._do_rest_request(
+            RequestTypes.post,
+            self._graphl_url,
+            json=data
+        )
         return GraphQlResponse(response.json())
 
     def _do_rest_request(self, function, url, **kwargs):
+        if "headers" not in kwargs:
+            kwargs["headers"] = self.headers
+
+        if isinstance(function, RequestType):
+            function = self._base_functions_mapping[function]
+
         try:
             response = function(url, **kwargs)
         except ConnectionRefusedError:
@@ -194,10 +224,9 @@ class API(object):
         self.log.debug("Executing [POST] {}".format(entrypoint))
         url = "{}/{}".format(self._rest_url, entrypoint)
         return self._do_rest_request(
-            requests.post,
+            RequestTypes.post,
             url,
-            json=kwargs,
-            headers=self.headers
+            json=kwargs
         )
 
     def put(self, entrypoint, **kwargs):
@@ -205,10 +234,9 @@ class API(object):
         self.log.debug("Executing [PUT] {}".format(entrypoint))
         url = "{}/{}".format(self._rest_url, entrypoint)
         return self._do_rest_request(
-            requests.put,
+            RequestTypes.put,
             url,
-            json=kwargs,
-            headers=self.headers
+            json=kwargs
         )
 
     def patch(self, entrypoint, **kwargs):
@@ -216,10 +244,9 @@ class API(object):
         self.log.debug("Executing [PATCH] {}".format(entrypoint))
         url = "{}/{}".format(self._rest_url, entrypoint)
         return self._do_rest_request(
-            requests.patch,
+            RequestTypes.patch,
             url,
-            json=kwargs,
-            headers=self.headers
+            json=kwargs
         )
 
     def get(self, entrypoint, **kwargs):
@@ -227,10 +254,9 @@ class API(object):
         self.log.debug("Executing [GET] {}".format(entrypoint))
         url = "{}/{}".format(self._rest_url, entrypoint)
         return self._do_rest_request(
-            requests.get,
+            RequestTypes.get,
             url,
-            params=kwargs,
-            headers=self.headers
+            params=kwargs
         )
 
     def delete(self, entrypoint, **kwargs):
@@ -238,11 +264,145 @@ class API(object):
         self.log.debug("Executing [DELETE] {}".format(entrypoint))
         url = "{}/{}".format(self._rest_url, entrypoint)
         return self._do_rest_request(
-            requests.delete,
+            RequestTypes.delete,
             url,
-            params=kwargs,
-            headers=self.headers
+            params=kwargs
         )
+
+
+class API(APIBase):
+    def get_projects_basic(self):
+        projects_query = """
+        query ProjectsBasic {
+            projects {
+                edges { node {
+                    name
+                    active
+                    library
+                }}
+            }
+        }
+        """
+        data = self.query(projects_query).data
+        return data["data"]["projects"]["edges"]
+
+    def get_project_names(self):
+        response = self.get("projects")
+        # TODO check status
+        response.status
+        data = response.data
+        project_names = []
+        if data:
+            for project in data["projects"]:
+                project_names.append(project["name"])
+        return project_names
+
+    def get_project(self, project_name):
+        output = self.get("projects/{}".format(project_name)).data
+        if output.get("code") == 404:
+            return None
+        return output
+
+    def get_project_folders(self, project_name):
+        structure_query = """
+        query ProjectFolders($projectName: String!) {
+            project(name: $projectName) {
+                folders { edges { node {
+                    name
+                    active
+                    id
+                    folderType
+                    parentId
+                    parents
+                }}}
+            }
+        }
+        """
+        result_data = self.query(
+            structure_query, projectName=project_name
+        ).data
+        folders = []
+        project_data = result_data["data"]["project"]
+        if project_data is None:
+            return folders
+
+        hierarchy_queue = collections.deque()
+        hierarchy_queue.append(project_data)
+        while hierarchy_queue:
+            folder = hierarchy_queue.popleft()
+            if "folders" in folder:
+                for edge in folder.pop("folders")["edges"]:
+                    hierarchy_queue.append(edge["node"])
+
+            if folder:
+                folders.append(folder)
+        return folders
+
+    def get_project_tasks(self, project_name):
+        structure_query = """
+        query ProjectTasks($projectName: String!) {
+            project(name: $projectName) {
+                tasks { edges { node {
+                    active
+                    id
+                    name
+                    taskType
+                    folderId
+                }}}
+            }
+        }
+        """
+        result_data = self.query(
+            structure_query, projectName=project_name
+        ).data
+        tasks = []
+        project_data = result_data["data"]["project"]
+        if project_data is None:
+            return tasks
+
+        hierarchy_queue = collections.deque()
+        hierarchy_queue.append(project_data)
+        while hierarchy_queue:
+            task = hierarchy_queue.popleft()
+            if "tasks" in task:
+                for edge in task.pop("tasks")["edges"]:
+                    hierarchy_queue.append(edge["node"])
+
+            if tasks:
+                tasks.append(task)
+        return tasks
+
+    def get_tasks_by_folder_ids(self, project_name, folder_ids):
+        tasks_query = """
+        query ProjectTasksByFolderId($projectName: String!, $folderIds: [String!]) {
+            project(name: $projectName) {
+                tasks(folderIds: $folderIds) { edges { node {
+                    active
+                    id
+                    name
+                    taskType
+                    folderId
+                }}}
+            }
+        }
+        """
+        if not folder_ids:
+            return []
+        if isinstance(folder_ids, six.string_types):
+            folder_ids = [folder_ids]
+
+        response = self.query(
+            tasks_query, projectName=project_name, folderIds=folder_ids
+        )
+        result_data = response.data
+        tasks = []
+        project_data = result_data["data"]["project"]
+        if project_data is None:
+            raise ProjectNotFound(project_name)
+
+        for edge in project_data["tasks"]["edges"]:
+            tasks.append(edge["node"])
+        return tasks
 
 
 class GlobalContext:
@@ -256,145 +416,77 @@ class GlobalContext:
             cls._connection = con
         return cls._connection
 
+    @staticmethod
+    def create_session():
+        session = Session(url)
+        session.login(username, password)
+        return session
+
+
+class Session(API):
+    def __init__(self, *args, **kwargs):
+        super(Session, self).__init__(*args, **kwargs)
+        self._session = None
+        self._function_mapping = {}
+
+    def login(self, *args, **kwargs):
+        super(Session, self).login(*args, **kwargs)
+        if self._access_token:
+            session = requests.Session()
+            session.headers.update(self.headers)
+            self._function_mapping = {
+                RequestTypes.get: session.get,
+                RequestTypes.post: session.post,
+                RequestTypes.put: session.put,
+                RequestTypes.patch: session.patch,
+                RequestTypes.delete: session.delete
+            }
+            self._session = session
+
+    def logout(self, *args, **kwargs):
+        self.close()
+        super(Session, self).logout(*args, **kwargs)
+
+    def close(self):
+        self._function_mapping = {}
+        self._session.close()
+        self._session = None
+
+    def _do_rest_request(self, function, url, **kwargs):
+        if function in self._function_mapping:
+            function = self._function_mapping[function]
+        return super(Session, self)._do_rest_request(function, url, **kwargs)
+
 
 def get_projects_basic():
-    projects_query = """
-    query ProjectsBasic {
-        projects {
-            edges { node {
-                name
-                active
-                library
-            }}
-        }
-    }
-    """
     con = GlobalContext.get_connection()
-    data = con.query(projects_query).data
-    return data["data"]["projects"]["edges"]
+    return con.get_projects_basic()
 
 
 def get_project_names():
     con = GlobalContext.get_connection()
-    response = con.get("projects")
-    # TODO check status
-    response.status
-    data = response.data
-    project_names = []
-    if data:
-        for project in data["projects"]:
-            project_names.append(project["name"])
-    return project_names
+    return con.get_project_names()
 
 
 def get_project(project_name):
     con = GlobalContext.get_connection()
-    output = con.get("projects/{}".format(project_name)).data
-    if output.get("code") == 404:
-        return None
-    return output
+    return con.get_project(project_name)
 
 
 def get_project_folders(project_name):
-    structure_query = """
-    query ProjectFolders($projectName: String!) {
-        project(name: $projectName) {
-            folders { edges { node {
-                name
-                active
-                id
-                folderType
-                parentId
-                parents
-            }}}
-        }
-    }
-    """
     con = GlobalContext.get_connection()
-    result_data = con.query(structure_query, projectName=project_name).data
-    folders = []
-    project_data = result_data["data"]["project"]
-    if project_data is None:
-        return folders
+    return con.get_project_folders(project_name)
 
-    hierarchy_queue = collections.deque()
-    hierarchy_queue.append(project_data)
-    while hierarchy_queue:
-        folder = hierarchy_queue.popleft()
-        if "folders" in folder:
-            for edge in folder.pop("folders")["edges"]:
-                hierarchy_queue.append(edge["node"])
 
-        if folder:
-            folders.append(folder)
-    return folders
+def get_tasks_by_folder_ids(project_name, folder_ids):
+    con = GlobalContext.get_connection()
+    return con.get_tasks_by_folder_ids(project_name, folder_ids)
 
 
 def get_project_tasks(project_name):
-    structure_query = """
-    query ProjectTasks($projectName: String!) {
-        project(name: $projectName) {
-            tasks { edges { node {
-                active
-                id
-                name
-                taskType
-                folderId
-            }}}
-        }
-    }
-    """
     con = GlobalContext.get_connection()
-    result_data = con.query(structure_query, projectName=project_name).data
-    tasks = []
-    project_data = result_data["data"]["project"]
-    if project_data is None:
-        return tasks
-
-    hierarchy_queue = collections.deque()
-    hierarchy_queue.append(project_data)
-    while hierarchy_queue:
-        task = hierarchy_queue.popleft()
-        if "tasks" in task:
-            for edge in task.pop("tasks")["edges"]:
-                hierarchy_queue.append(edge["node"])
-
-        if tasks:
-            tasks.append(task)
-    return tasks
+    return con.get_project_tasks(project_name)
 
 
-def get_tasks_by_folder_id(project_name, folder_id):
-    con = GlobalContext.get_connection()
-    tasks_query = """
-    query Project($projectName: String!, $folderId: String!) {
-        project(name: $projectName) {
-            folder(id: $folderId) {
-                tasks { edges { node {
-                    active
-                    id
-                    name
-                    taskType
-                    folderId
-                }}}
-            }
-        }
-    }
-    """
-    response = con.query(
-        tasks_query, projectName=project_name, folderId=folder_id
-    )
-    result_data = response.data
-    tasks = []
-    project_data = result_data["data"]["project"]
-    if project_data is None:
-        raise ProjectNotFound(project_name)
-
-    folder_data = result_data["data"]["project"]["folder"]
-    if folder_data is None:
-        raise FolderNotFound(project_name, folder_id)
-
-    for edge in folder_data["tasks"]["edges"]:
-        tasks.append(edge["node"])
-    return tasks
-
+def create_session():
+    return GlobalContext.create_session()
