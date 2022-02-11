@@ -5,16 +5,18 @@ from Qt import QtWidgets, QtCore, QtGui
 from avalon.vendor import qtawesome
 
 from openpype.tools.flickcharm import FlickCharm
-from openpype.tools.utils.assets_widget import SingleSelectAssetsWidget
-from openpype.tools.utils.tasks_widget import TasksWidget
+# --- Moved temporary into launcher folder ---
+from .folders_widget import SingleSelectFoldersWidget
+from .tasks_widget import TasksWidget
+# ----------------------------------------------
 
 from .delegates import ActionDelegate
 from . import lib
 from .models import (
     ActionModel,
     ProjectModel,
-    LauncherAssetsModel,
-    AssetRecursiveSortFilterModel,
+    LauncherFoldersModel,
+    FoldersRecursiveSortFilterModel,
     LauncherTaskModel,
     LauncherTasksProxyModel
 )
@@ -98,7 +100,7 @@ class LauncherTaskWidget(TasksWidget):
         super(LauncherTaskWidget, self).__init__(*args, **kwargs)
 
     def _create_source_model(self):
-        return LauncherTaskModel(self._launcher_model, self._dbcon)
+        return LauncherTaskModel(self._launcher_model)
 
     def _create_proxy_model(self, source_model):
         proxy = LauncherTasksProxyModel(self._launcher_model)
@@ -106,15 +108,17 @@ class LauncherTaskWidget(TasksWidget):
         return proxy
 
 
-class LauncherAssetsWidget(SingleSelectAssetsWidget):
+class LauncherFoldersWidget(SingleSelectFoldersWidget):
     def __init__(self, launcher_model, *args, **kwargs):
         self._launcher_model = launcher_model
 
-        super(LauncherAssetsWidget, self).__init__(*args, **kwargs)
+        super(LauncherFoldersWidget, self).__init__(
+            launcher_model.context, *args, **kwargs
+        )
 
-        launcher_model.assets_refresh_started.connect(self._on_refresh_start)
+        launcher_model.folders_refresh_started.connect(self._on_refresh_start)
 
-        self.set_current_asset_btn_visibility(False)
+        self.set_current_folder_btn_visibility(False)
 
     def _on_refresh_start(self):
         self._set_loading_state(loading=True, empty=True)
@@ -125,7 +129,7 @@ class LauncherAssetsWidget(SingleSelectAssetsWidget):
         return self._model.refreshing
 
     def refresh(self):
-        self._launcher_model.refresh_assets(force=True)
+        self._launcher_model.refresh_folders(force=True)
 
     def stop_refresh(self):
         raise ValueError("bug stop_refresh called")
@@ -134,12 +138,12 @@ class LauncherAssetsWidget(SingleSelectAssetsWidget):
         raise ValueError("bug _refresh_model called")
 
     def _create_source_model(self):
-        model = LauncherAssetsModel(self._launcher_model, self.dbcon)
+        model = LauncherFoldersModel(self._launcher_model)
         model.refreshed.connect(self._on_model_refresh)
         return model
 
     def _create_proxy_model(self, source_model):
-        proxy = AssetRecursiveSortFilterModel(self._launcher_model)
+        proxy = FoldersRecursiveSortFilterModel(self._launcher_model)
         proxy.setSourceModel(source_model)
         proxy.setFilterCaseSensitivity(QtCore.Qt.CaseInsensitive)
         proxy.setSortCaseSensitivity(QtCore.Qt.CaseInsensitive)
@@ -151,7 +155,7 @@ class LauncherAssetsWidget(SingleSelectAssetsWidget):
         self.refreshed.emit()
 
     def _on_filter_text_change(self, new_text):
-        self._launcher_model.set_asset_name_filter(new_text)
+        self._launcher_model.set_folder_name_filter(new_text)
 
 
 class ActionBar(QtWidgets.QWidget):
@@ -159,11 +163,10 @@ class ActionBar(QtWidgets.QWidget):
 
     action_clicked = QtCore.Signal(object)
 
-    def __init__(self, launcher_model, dbcon, parent=None):
+    def __init__(self, launcher_model, parent=None):
         super(ActionBar, self).__init__(parent)
 
         self._launcher_model = launcher_model
-        self.dbcon = dbcon
 
         view = QtWidgets.QListView(self)
         view.setProperty("mode", "icon")
@@ -179,7 +182,7 @@ class ActionBar(QtWidgets.QWidget):
         view.setSpacing(0)
         view.setWordWrap(True)
 
-        model = ActionModel(self.dbcon, self)
+        model = ActionModel(launcher_model, self)
         view.setModel(model)
 
         # TODO better group delegate

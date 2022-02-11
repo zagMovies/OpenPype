@@ -19,7 +19,7 @@ from .widgets import (
     ActionBar,
     ActionHistory,
     SlidePageWidget,
-    LauncherAssetsWidget,
+    LauncherFoldersWidget,
     LauncherTaskWidget
 )
 
@@ -117,15 +117,13 @@ class ProjectsPanel(QtWidgets.QWidget):
             self._launcher_model.set_project_name(project_name)
 
 
-class AssetsPanel(QtWidgets.QWidget):
-    """Assets page"""
+class ContextPanel(QtWidgets.QWidget):
+    """Page with context and actions"""
     back_clicked = QtCore.Signal()
     session_changed = QtCore.Signal()
 
-    def __init__(self, launcher_model, dbcon, parent=None):
-        super(AssetsPanel, self).__init__(parent=parent)
-
-        self.dbcon = dbcon
+    def __init__(self, launcher_model, parent=None):
+        super(ContextPanel, self).__init__(parent=parent)
 
         # Project bar
         btn_back_icon = qtawesome.icon("fa.angle-left", color="white")
@@ -140,15 +138,15 @@ class AssetsPanel(QtWidgets.QWidget):
         project_bar_layout.addWidget(btn_back)
         project_bar_layout.addWidget(project_bar)
 
-        # Assets widget
-        assets_widget = LauncherAssetsWidget(
-            launcher_model, dbcon=self.dbcon, parent=self
+        # Folders widget
+        folders_widget = LauncherFoldersWidget(
+            launcher_model, parent=self
         )
-        # Make assets view flickable
-        assets_widget.activate_flick_charm()
+        # Make folders view flickable
+        folders_widget.activate_flick_charm()
 
         # Tasks widget
-        tasks_widget = LauncherTaskWidget(launcher_model, self.dbcon, self)
+        tasks_widget = LauncherTaskWidget(launcher_model, self)
 
         # Body
         body = QtWidgets.QSplitter(self)
@@ -158,7 +156,7 @@ class AssetsPanel(QtWidgets.QWidget):
             QtWidgets.QSizePolicy.Expanding
         )
         body.setOrientation(QtCore.Qt.Horizontal)
-        body.addWidget(assets_widget)
+        body.addWidget(folders_widget)
         body.addWidget(tasks_widget)
         body.setStretchFactor(0, 100)
         body.setStretchFactor(1, 65)
@@ -171,24 +169,24 @@ class AssetsPanel(QtWidgets.QWidget):
 
         # signals
         launcher_model.project_changed.connect(self._on_project_changed)
-        assets_widget.selection_changed.connect(self._on_asset_changed)
-        assets_widget.refreshed.connect(self._on_asset_changed)
+        folders_widget.selection_changed.connect(self._on_folder_changed)
+        folders_widget.refreshed.connect(self._on_folder_changed)
         tasks_widget.task_changed.connect(self._on_task_change)
 
         btn_back.clicked.connect(self.back_clicked)
 
         self.project_bar = project_bar
-        self.assets_widget = assets_widget
+        self.folders_widget = folders_widget
         self._tasks_widget = tasks_widget
         self._btn_back = btn_back
 
         self._launcher_model = launcher_model
 
     def select_asset(self, asset_name):
-        self.assets_widget.select_asset_by_name(asset_name)
+        self.folders_widget.select_asset_by_name(asset_name)
 
     def showEvent(self, event):
-        super(AssetsPanel, self).showEvent(event)
+        super(ContextPanel, self).showEvent(event)
 
         # Change size of a btn
         # WARNING does not handle situation if combobox is bigger
@@ -196,32 +194,30 @@ class AssetsPanel(QtWidgets.QWidget):
         self._btn_back.setFixedSize(QtCore.QSize(btn_size, btn_size))
 
     def select_task_name(self, task_name):
-        self._on_asset_changed()
+        self._on_folder_changed()
         self._tasks_widget.select_task_name(task_name)
 
     def _on_project_changed(self):
         self.session_changed.emit()
 
-    def _on_asset_changed(self):
-        """Callback on asset selection changed
+    def _on_folder_changed(self):
+        """Callback on folder selection changed
 
         This updates the task view.
         """
 
-        # Check asset on current index and selected assets
-        asset_id = self.assets_widget.get_selected_asset_id()
-        asset_name = self.assets_widget.get_selected_asset_name()
+        # Check folder on current index and selected folders
+        folder_id = self.folders_widget.get_selected_folder_id()
 
-        self.dbcon.Session["AVALON_TASK"] = None
-        self.dbcon.Session["AVALON_ASSET"] = asset_name
+        self._launcher_model.context.set_folder_id(folder_id)
 
         self.session_changed.emit()
 
-        self._tasks_widget.set_asset_id(asset_id)
+        self._tasks_widget.set_folder_id(folder_id)
 
     def _on_task_change(self):
-        task_name = self._tasks_widget.get_selected_task_name()
-        self.dbcon.Session["AVALON_TASK"] = task_name
+        task_id = self._tasks_widget.get_selected_task_id()
+        self._launcher_model.context.set_task_id(task_id)
         self.session_changed.emit()
 
 
@@ -235,7 +231,6 @@ class LauncherWindow(QtWidgets.QDialog):
         self.log = logging.getLogger(
             ".".join([__name__, self.__class__.__name__])
         )
-        self.dbcon = AvalonMongoDB()
 
         self.setWindowTitle("Launcher")
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
@@ -254,17 +249,17 @@ class LauncherWindow(QtWidgets.QDialog):
             | QtCore.Qt.WindowCloseButtonHint
         )
 
-        launcher_model = LauncherModel(self.dbcon)
+        launcher_model = LauncherModel()
 
         project_panel = ProjectsPanel(launcher_model)
-        asset_panel = AssetsPanel(launcher_model, self.dbcon)
+        context_panel = ContextPanel(launcher_model)
 
         page_slider = SlidePageWidget()
         page_slider.addWidget(project_panel)
-        page_slider.addWidget(asset_panel)
+        page_slider.addWidget(context_panel)
 
         # actions
-        actions_bar = ActionBar(launcher_model, self.dbcon, self)
+        actions_bar = ActionBar(launcher_model, self)
 
         # statusbar
         message_label = QtWidgets.QLabel(self)
@@ -308,8 +303,8 @@ class LauncherWindow(QtWidgets.QDialog):
         action_history.trigger_history.connect(self.on_history_action)
         launcher_model.project_changed.connect(self.on_project_change)
         launcher_model.timer_timeout.connect(self._on_refresh_timeout)
-        asset_panel.back_clicked.connect(self.on_back_clicked)
-        asset_panel.session_changed.connect(self.on_session_changed)
+        context_panel.back_clicked.connect(self.on_back_clicked)
+        context_panel.session_changed.connect(self.on_session_changed)
 
         self.resize(520, 740)
 
@@ -321,7 +316,7 @@ class LauncherWindow(QtWidgets.QDialog):
 
         self._message_label = message_label
         self.project_panel = project_panel
-        self.asset_panel = asset_panel
+        self.context_panel = context_panel
         self.actions_bar = actions_bar
         self.action_history = action_history
         self.page_slider = page_slider
@@ -383,6 +378,8 @@ class LauncherWindow(QtWidgets.QDialog):
         self.run_action(action)
 
     def on_history_action(self, history_data):
+        print("History does not work now")
+        return
         action, session = history_data
         app = QtWidgets.QApplication.instance()
         modifiers = app.keyboardModifiers()
@@ -396,13 +393,11 @@ class LauncherWindow(QtWidgets.QDialog):
             self.run_action(action, session=session)
 
     def run_action(self, action, session=None):
-        if session is None:
-            session = copy.deepcopy(self.dbcon.Session)
-
+        context = self._launcher_model.context
         filtered_session = {
-            key: value
-            for key, value in session.items()
-            if value
+            "AVALON_PROJECT": context.project_name,
+            "AVALON_ASSET": context.folder_id,
+            "AVALON_TASK": context.task_id
         }
         # Add to history
         self.action_history.add_action(action, filtered_session)
@@ -415,24 +410,24 @@ class LauncherWindow(QtWidgets.QDialog):
             self.echo("Failed: {}".format(str(exc)))
 
     def set_session(self, session):
+        print("Set session does not work", session)
+        return
         project_name = session.get("AVALON_PROJECT")
         asset_name = session.get("AVALON_ASSET")
         task_name = session.get("AVALON_TASK")
 
-        if project_name:
-            # Force the "in project" view.
-            self.page_slider.slide_view(1, direction="right")
-            index = self.asset_panel.project_bar.project_combobox.findText(
-                project_name
-            )
-            if index >= 0:
-                self.asset_panel.project_bar.project_combobox.setCurrentIndex(
-                    index
-                )
+        if not project_name:
+            return
 
-        if asset_name:
-            self.asset_panel.select_asset(asset_name)
+        # Force the "in project" view.
+        self.page_slider.slide_view(1, direction="right")
+        self.launcher_model.set_project_name(project_name)
+
+        if not asset_name:
+            return
+
+        self.context_panel.select_asset(asset_name)
 
         if task_name:
             # requires a forced refresh first
-            self.asset_panel.select_task_name(task_name)
+            self.context_panel.select_task_name(task_name)

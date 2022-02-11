@@ -11,17 +11,18 @@ from avalon.vendor import qtawesome
 from avalon import api
 from openpype.lib import ApplicationManager, JSONSettingRegistry
 from openpype.tools.utils.lib import DynamicQThread
-from openpype.tools.utils.assets_widget import (
-    AssetModel,
-    ASSET_NAME_ROLE
+# --- Moved temporary into launcher folder ---
+from .folders_widget import (
+    FoldersModel,
+    FOLDER_NAME_ROLE
 )
-from openpype.tools.utils.tasks_widget import (
+from .tasks_widget import (
     TasksModel,
     TasksProxyModel,
     TASK_TYPE_ROLE,
     TASK_ASSIGNEE_ROLE
 )
-
+# ----------------------------------------------
 from . import lib
 from .constants import (
     ACTION_ROLE,
@@ -31,18 +32,56 @@ from .constants import (
     FORCE_NOT_OPEN_WORKFILE_ROLE
 )
 from .actions import ApplicationAction
+from .client import (
+    get_project_names,
+    get_project_folders,
+    get_project_tasks,
+)
 
 log = logging.getLogger(__name__)
 
-# Must be different than roles in default asset model
-ASSET_TASK_TYPES_ROLE = QtCore.Qt.UserRole + 10
-ASSET_ASSIGNEE_ROLE = QtCore.Qt.UserRole + 11
+# Must be different than roles in default folder model
+FOLDER_TASK_TYPES_ROLE = QtCore.Qt.UserRole + 10
+FOLDER_ASSIGNEE_ROLE = QtCore.Qt.UserRole + 11
+
+
+class SelectedContext(object):
+    def __init__(self):
+        self._project_name = None
+        self._folder_id = None
+        self._task_id = None
+
+    @property
+    def project_name(self):
+        return self._project_name
+
+    @property
+    def folder_id(self):
+        return self._folder_id
+
+    @property
+    def task_id(self):
+        return self._task_id
+
+    def set_project_name(self, project_name):
+        if project_name != self._project_name:
+            self._project_name = project_name
+            self.set_folder_id(None)
+
+    def set_folder_id(self, folder_id):
+        if self._folder_id != folder_id:
+            self._folder_id = folder_id
+            self.set_task_id(None)
+
+    def set_task_id(self, task_id):
+        if self._task_id != task_id:
+            self._task_id = None
 
 
 class ActionModel(QtGui.QStandardItemModel):
-    def __init__(self, dbcon, parent=None):
+    def __init__(self, launcher_model, parent=None):
         super(ActionModel, self).__init__(parent=parent)
-        self.dbcon = dbcon
+        self.context = launcher_model.context
 
         self.application_manager = ApplicationManager()
 
@@ -73,18 +112,17 @@ class ActionModel(QtGui.QStandardItemModel):
 
     def get_application_actions(self):
         actions = []
-        if not self.dbcon.Session.get("AVALON_PROJECT"):
+        if not self.context.project_name:
             return actions
 
-        project_doc = self.dbcon.find_one(
-            {"type": "project"},
-            {"config.apps": True}
-        )
-        if not project_doc:
-            return actions
+        # project_data = get_project(self.context.project_name)
+        # if not project_data:
+        #     return actions
 
+        # NOTE hardcoded for now
+        project_data = {"config": {"apps": [{"name": "maya/2020"}]}}
         self.application_manager.refresh()
-        for app_def in project_doc["config"]["apps"]:
+        for app_def in project_data["config"]["apps"]:
             app_name = app_def["name"]
             app = self.application_manager.applications.get(app_name)
             if not app or not app.enabled:
@@ -239,11 +277,10 @@ class ActionModel(QtGui.QStandardItemModel):
         """
 
         compatible = []
-        _session = copy.deepcopy(self.dbcon.Session)
         session = {
-            key: value
-            for key, value in _session.items()
-            if value
+            "AVALON_PROJECT": self.context.project_name,
+            "AVALON_ASSET": self.context.folder_id,
+            "AVALON_TASK": self.context.task_id,
         }
 
         for action in actions:
@@ -309,7 +346,7 @@ class ActionModel(QtGui.QStandardItemModel):
 
         There might be specific tasks where is unwanted to open workfile right
         always (broken file, low performance). This allows artist to mark to
-        skip opening for combination (project, asset, task_name, app)
+        skip opening for combination (project, folder_id, task_name, app)
 
         Args:
             item (QStandardItem)
@@ -334,9 +371,9 @@ class ActionModel(QtGui.QStandardItemModel):
         if action:
             compare_data = {
                 "app_label": action.label.lower(),
-                "project_name": self.dbcon.Session["AVALON_PROJECT"],
-                "asset": self.dbcon.Session["AVALON_ASSET"],
-                "task_name": self.dbcon.Session["AVALON_TASK"]
+                "project_name": self.context.project_name,
+                "asset": self.context.folder_id,
+                "task_name": self.context.task_id,
             }
         return compare_data
 
@@ -354,29 +391,18 @@ class LauncherModel(QtCore.QObject):
     # Projects were refreshed
     projects_refreshed = QtCore.Signal()
 
-    # Signals ONLY for assets model!
-    # - other objects should listen to asset model signals
-    # Asset refresh started
-    assets_refresh_started = QtCore.Signal()
-    # Assets refresh finished
-    assets_refreshed = QtCore.Signal()
+    # Signals ONLY for folders model!
+    # - other objects should listen to folder model signals
+    # Folders refresh started
+    folders_refresh_started = QtCore.Signal()
+    # Folders refresh finished
+    folders_refreshed = QtCore.Signal()
 
     # Refresh timer timeout
     #   - give ability to tell parent window that this timer still runs
     timer_timeout = QtCore.Signal()
 
-    # Duplication from AssetsModel with "data.tasks"
-    _asset_projection = {
-        "name": 1,
-        "parent": 1,
-        "data.visualParent": 1,
-        "data.label": 1,
-        "data.icon": 1,
-        "data.color": 1,
-        "data.tasks": 1
-    }
-
-    def __init__(self, dbcon):
+    def __init__(self):
         super(LauncherModel, self).__init__()
         # Refresh timer
         #   - should affect only projects
@@ -386,32 +412,33 @@ class LauncherModel(QtCore.QObject):
 
         self._refresh_timer = refresh_timer
 
+        self._context = SelectedContext()
+
         # Launcher is active
         self._active = False
 
-        # Global data
-        self._dbcon = dbcon
         # Available project names
         self._project_names = set()
 
         # Context data
-        self._asset_docs = []
-        self._asset_docs_by_id = {}
-        self._asset_filter_data_by_id = {}
+        self._folders = []
+        self._folders_by_id = {}
+        self._folder_filter_data_by_id = {}
         self._assignees = set()
         self._task_types = set()
+        self._tasks_by_folder_id = {}
 
         # Filters
-        self._asset_name_filter = ""
+        self._folder_name_filter = ""
         self._assignee_filters = set()
         self._task_type_filters = set()
 
-        # Last project for which were assets queried
+        # Last project for which were folders queried
         self._last_project_name = None
-        # Asset refresh thread is running
-        self._refreshing_assets = False
-        # Asset refresh thread
-        self._asset_refresh_thread = None
+        # Folder refresh thread is running
+        self._refreshing_folders = False
+        # Folder refresh thread
+        self._folders_refresh_thread = None
 
     def _on_timeout(self):
         """Refresh timer timeout."""
@@ -434,19 +461,23 @@ class LauncherModel(QtCore.QObject):
         self._refresh_timer.stop()
 
     @property
+    def context(self):
+        return self._context
+
+    @property
     def project_name(self):
         """Current project name."""
-        return self._dbcon.Session.get("AVALON_PROJECT")
+        return self._context.project_name
 
     @property
-    def refreshing_assets(self):
+    def refreshing_folders(self):
         """Refreshing thread is running."""
-        return self._refreshing_assets
+        return self._refreshing_folders
 
     @property
-    def asset_docs(self):
-        """Access to asset docs."""
-        return self._asset_docs
+    def folders(self):
+        """Access to folders."""
+        return self._folders
 
     @property
     def project_names(self):
@@ -454,18 +485,18 @@ class LauncherModel(QtCore.QObject):
         return self._project_names
 
     @property
-    def asset_filter_data_by_id(self):
-        """Prepared filter data by asset id."""
-        return self._asset_filter_data_by_id
+    def folder_filter_data_by_id(self):
+        """Prepared filter data by folder id."""
+        return self._folder_filter_data_by_id
 
     @property
     def assignees(self):
-        """All assignees for all assets in current project."""
+        """All assignees for all folders in current project."""
         return self._assignees
 
     @property
     def task_types(self):
-        """All task types for all assets in current project.
+        """All task types for all folders in current project.
 
         TODO: This could be maybe taken from project document where are all
         task types...
@@ -483,34 +514,38 @@ class LauncherModel(QtCore.QObject):
         return self._assignee_filters
 
     @property
-    def asset_name_filter(self):
-        """Asset name filter (can be used as regex filter)."""
-        return self._asset_name_filter
+    def folder_name_filter(self):
+        """Folder name filter (can be used as regex filter)."""
+        return self._folder_name_filter
 
-    def get_asset_doc(self, asset_id):
-        """Get single asset document by id."""
-        return self._asset_docs_by_id.get(asset_id)
+    def get_folder_by_id(self, folder_id):
+        """Get single folder by id."""
+        return self._folders_by_id.get(folder_id)
+
+    def get_tasks_by_folder_id(self, folder_id):
+        return self._tasks_by_folder_id.get(folder_id)
 
     def set_project_name(self, project_name):
-        """Change project name and refresh asset documents."""
+        """Change project name and refresh folder documents."""
         if project_name == self.project_name:
             return
-        self._dbcon.Session["AVALON_PROJECT"] = project_name
+        self._context.set_project_name(project_name)
         self.project_changed.emit(project_name)
 
-        self.refresh_assets(force=True)
+        self.refresh_folders(force=True)
 
     def refresh(self):
         """Trigger refresh of whole model."""
         self.refresh_projects()
-        self.refresh_assets(force=False)
+        self.refresh_folders(force=False)
 
     def refresh_projects(self):
         """Refresh projects."""
         current_project = self.project_name
         project_names = set()
-        for project_doc in self._dbcon.projects(only_active=True):
-            project_names.add(project_doc["name"])
+
+        for project_name in get_project_names():
+            project_names.add(project_name)
 
         self._project_names = project_names
         self.projects_refreshed.emit()
@@ -520,33 +555,40 @@ class LauncherModel(QtCore.QObject):
         ):
             self.set_project_name(None)
 
-    def _set_asset_docs(self, asset_docs=None):
-        """Set asset documents and all related data.
+    def _set_project_hierarchy(self, folders_data=None, tasks_data=None):
+        """Set folder and all related data.
 
-        Method extract and prepare data needed for assets and tasks widget and
+        Method extract and prepare data needed for folders and tasks widget and
         prepare filtering data.
         """
-        if asset_docs is None:
-            asset_docs = []
+        if folders_data is None:
+            folders_data = []
+
+        if tasks_data is None:
+            tasks_data = []
+
+        tasks_by_folder_id = collections.defaultdict(list)
+        for task_data in tasks_data:
+            tasks_by_folder_id[task_data["folderId"]].append(task_data)
 
         all_task_types = set()
         all_assignees = set()
-        asset_docs_by_id = {}
-        asset_filter_data_by_id = {}
-        for asset_doc in asset_docs:
+        folders_by_id = {}
+        folder_filter_data_by_id = {}
+        for folder_data in folders_data:
             task_types = set()
             assignees = set()
-            asset_id = asset_doc["_id"]
-            asset_docs_by_id[asset_id] = asset_doc
-            asset_tasks = asset_doc.get("data", {}).get("tasks")
-            asset_filter_data_by_id[asset_id] = {
+            folder_id = folder_data["id"]
+            folders_by_id[folder_id] = folder_data
+            folder_tasks = tasks_by_folder_id[folder_id]
+            folder_filter_data_by_id[folder_id] = {
                 "assignees": assignees,
                 "task_types": task_types
             }
-            if not asset_tasks:
+            if not folder_tasks:
                 continue
 
-            for task_data in asset_tasks.values():
+            for task_data in folder_tasks:
                 task_assignees = set()
                 _task_assignees = task_data.get("assignees")
                 if _task_assignees:
@@ -562,13 +604,14 @@ class LauncherModel(QtCore.QObject):
             all_task_types |= task_types
             all_assignees |= assignees
 
-        self._asset_docs_by_id = asset_docs_by_id
-        self._asset_docs = asset_docs
-        self._asset_filter_data_by_id = asset_filter_data_by_id
+        self._folders_by_id = folders_by_id
+        self._folders = folders_data
+        self._folder_filter_data_by_id = folder_filter_data_by_id
         self._assignees = all_assignees
         self._task_types = all_task_types
+        self._tasks_by_folder_id = tasks_by_folder_id
 
-        self.assets_refreshed.emit()
+        self.folders_refreshed.emit()
 
     def set_task_type_filter(self, task_types):
         """Change task type filter.
@@ -590,22 +633,22 @@ class LauncherModel(QtCore.QObject):
         self._assignee_filters = assignees
         self.filters_changed.emit()
 
-    def set_asset_name_filter(self, text_filter):
-        """Change asset name filter.
+    def set_folder_name_filter(self, text_filter):
+        """Change folder name filter.
 
         Args:
-            text_filter (str): Asset name filter. Pass empty string to
+            text_filter (str): Folder name filter. Pass empty string to
             turn filter off.
         """
-        self._asset_name_filter = text_filter
+        self._folder_name_filter = text_filter
         self.filters_changed.emit()
 
-    def refresh_assets(self, force=True):
-        """Refresh assets."""
-        self.assets_refresh_started.emit()
+    def refresh_folders(self, force=True):
+        """Refresh folders."""
+        self.folders_refresh_started.emit()
 
         if self.project_name is None:
-            self._set_asset_docs()
+            self._set_project_hierarchy()
             return
 
         if (
@@ -616,28 +659,29 @@ class LauncherModel(QtCore.QObject):
 
         self._stop_fetch_thread()
 
-        self._refreshing_assets = True
+        self._refreshing_folders = True
         self._last_project_name = self.project_name
-        self._asset_refresh_thread = DynamicQThread(self._refresh_assets)
-        self._asset_refresh_thread.start()
+        self._folders_refresh_thread = DynamicQThread(self._refresh_folders)
+        self._folders_refresh_thread.start()
 
     def _stop_fetch_thread(self):
-        self._refreshing_assets = False
-        if self._asset_refresh_thread is not None:
-            while self._asset_refresh_thread.isRunning():
+        self._refreshing_folders = False
+        if self._folders_refresh_thread is not None:
+            while self._folders_refresh_thread.isRunning():
                 # TODO this is blocking UI should be done in a different way
                 time.sleep(0.01)
-            self._asset_refresh_thread = None
+            self._folders_refresh_thread = None
 
-    def _refresh_assets(self):
-        asset_docs = list(self._dbcon.find(
-            {"type": "asset"},
-            self._asset_projection
-        ))
-        if not self._refreshing_assets:
+    def _refresh_folders(self):
+        folders_data = get_project_folders(self._context.project_name)
+        if not self._refreshing_folders:
             return
-        self._refreshing_assets = False
-        self._set_asset_docs(asset_docs)
+        task_data = get_project_tasks(self._context.project_name)
+        if not self._refreshing_folders:
+            return
+
+        self._refreshing_folders = False
+        self._set_project_hierarchy(folders_data, task_data)
 
 
 class LauncherTasksProxyModel(TasksProxyModel):
@@ -685,20 +729,23 @@ class LauncherTasksProxyModel(TasksProxyModel):
 class LauncherTaskModel(TasksModel):
     def __init__(self, launcher_model, *args, **kwargs):
         self._launcher_model = launcher_model
-        super(LauncherTaskModel, self).__init__(*args, **kwargs)
+        super(LauncherTaskModel, self).__init__(
+            launcher_model.context, *args, **kwargs
+        )
 
-    def set_asset_id(self, asset_id):
-        asset_doc = None
-        if self._context_is_valid():
-            asset_doc = self._launcher_model.get_asset_doc(asset_id)
-        self._set_asset(asset_doc)
+    def set_folder_id(self, folder_id):
+        if not self._context_is_valid():
+            folder_id = None
+
+        tasks = self._launcher_model.get_tasks_by_folder_id(folder_id)
+        self._set_folder_tasks(folder_id, tasks)
 
 
-class AssetRecursiveSortFilterModel(QtCore.QSortFilterProxyModel):
+class FoldersRecursiveSortFilterModel(QtCore.QSortFilterProxyModel):
     def __init__(self, launcher_model, *args, **kwargs):
         self._launcher_model = launcher_model
 
-        super(AssetRecursiveSortFilterModel, self).__init__(*args, **kwargs)
+        super(FoldersRecursiveSortFilterModel, self).__init__(*args, **kwargs)
 
         launcher_model.filters_changed.connect(self._on_filter_change)
         self._name_filter = ""
@@ -706,7 +753,7 @@ class AssetRecursiveSortFilterModel(QtCore.QSortFilterProxyModel):
         self._assignee_filter = set()
 
     def _on_filter_change(self):
-        self._name_filter = self._launcher_model.asset_name_filter
+        self._name_filter = self._launcher_model.folder_name_filter
         self._task_types_filter = self._launcher_model.task_type_filters
         self._assignee_filter = self._launcher_model.assignee_filters
         self.invalidateFilter()
@@ -728,17 +775,17 @@ class AssetRecursiveSortFilterModel(QtCore.QSortFilterProxyModel):
         # Check current index itself
         valid = True
         if self._name_filter:
-            name = model.data(source_index, ASSET_NAME_ROLE)
+            name = model.data(source_index, FOLDER_NAME_ROLE)
             if not re.search(self._name_filter, name, re.IGNORECASE):
                 valid = False
 
         if valid and self._task_types_filter:
-            task_types = model.data(source_index, ASSET_TASK_TYPES_ROLE)
+            task_types = model.data(source_index, FOLDER_TASK_TYPES_ROLE)
             if not self._task_types_filter.intersection(task_types):
                 valid = False
 
         if valid and self._assignee_filter:
-            assignee = model.data(source_index, ASSET_ASSIGNEE_ROLE)
+            assignee = model.data(source_index, FOLDER_ASSIGNEE_ROLE)
             if not self._assignee_filter.intersection(assignee):
                 valid = False
 
@@ -753,19 +800,19 @@ class AssetRecursiveSortFilterModel(QtCore.QSortFilterProxyModel):
         return False
 
 
-class LauncherAssetsModel(AssetModel):
-    def __init__(self, launcher_model, dbcon, parent=None):
+class LauncherFoldersModel(FoldersModel):
+    def __init__(self, launcher_model, parent=None):
         self._launcher_model = launcher_model
-        # Make sure that variable is available (even if is in AssetModel)
+        # Make sure that variable is available (even if is in FoldersModel)
         self._last_project_name = None
 
-        super(LauncherAssetsModel, self).__init__(dbcon, parent)
+        super(LauncherFoldersModel, self).__init__(None, parent)
 
         launcher_model.project_changed.connect(self._on_project_change)
-        launcher_model.assets_refresh_started.connect(
+        launcher_model.folders_refresh_started.connect(
             self._on_launcher_refresh_start
         )
-        launcher_model.assets_refreshed.connect(self._on_launcher_refresh)
+        launcher_model.folders_refreshed.connect(self._on_launcher_refresh)
 
     def _on_launcher_refresh_start(self):
         self._refreshing = True
@@ -775,21 +822,23 @@ class LauncherAssetsModel(AssetModel):
             self._last_project_name = project_name
 
     def _on_launcher_refresh(self):
-        self._fill_assets(self._launcher_model.asset_docs)
+        self._fill_folders(self._launcher_model.folders)
         self._refreshing = False
-        self.refreshed.emit(bool(self._items_by_asset_id))
+        self.refreshed.emit(bool(self._items_by_folder_id))
 
-    def _fill_assets(self, *args, **kwargs):
-        super(LauncherAssetsModel, self)._fill_assets(*args, **kwargs)
-        asset_filter_data_by_id = self._launcher_model.asset_filter_data_by_id
-        for asset_id, item in self._items_by_asset_id.items():
-            filter_data = asset_filter_data_by_id.get(asset_id)
+    def _fill_folders(self, *args, **kwargs):
+        super(LauncherFoldersModel, self)._fill_folders(*args, **kwargs)
+        folder_filter_data_by_id = (
+            self._launcher_model.folder_filter_data_by_id
+        )
+        for folder_id, item in self._items_by_folder_id.items():
+            filter_data = folder_filter_data_by_id.get(folder_id)
 
             assignees = filter_data["assignees"]
             task_types = filter_data["task_types"]
 
-            item.setData(assignees, ASSET_ASSIGNEE_ROLE)
-            item.setData(task_types, ASSET_TASK_TYPES_ROLE)
+            item.setData(assignees, FOLDER_ASSIGNEE_ROLE)
+            item.setData(task_types, FOLDER_TASK_TYPES_ROLE)
 
     def _on_project_change(self):
         self._clear_items()
