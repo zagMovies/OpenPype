@@ -7,6 +7,11 @@ import requests
 import six
 
 
+url = ""
+username = ""
+password = ""
+
+
 class RequestType:
     def __init__(self, name):
         self.name = name

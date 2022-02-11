@@ -10,18 +10,17 @@ from avalon.vendor import qtawesome
 from avalon import api
 from openpype.lib import ApplicationManager, JSONSettingRegistry
 from openpype.tools.utils.lib import DynamicQThread
-# --- Moved temporary into launcher folder ---
-from .folders_widget import (
+from openpype.tools.utils.folders_widget import (
     FoldersModel,
     FOLDER_NAME_ROLE
 )
-from .tasks_widget import (
+from openpype.tools.utils.tasks_widget import (
     TasksModel,
     TasksProxyModel,
     TASK_TYPE_ROLE,
     TASK_ASSIGNEE_ROLE
 )
-# ----------------------------------------------
+from openpype.tools.utils.client import create_session
 from . import lib
 from .constants import (
     ACTION_ROLE,
@@ -31,7 +30,6 @@ from .constants import (
     FORCE_NOT_OPEN_WORKFILE_ROLE
 )
 from .actions import ApplicationAction
-from .client import create_session
 
 log = logging.getLogger(__name__)
 

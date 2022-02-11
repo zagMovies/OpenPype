@@ -5,10 +5,8 @@ from Qt import QtWidgets, QtCore, QtGui
 from avalon.vendor import qtawesome
 
 from openpype.tools.flickcharm import FlickCharm
-# --- Moved temporary into launcher folder ---
-from .folders_widget import SingleSelectFoldersWidget
-from .tasks_widget import TasksWidget
-# ----------------------------------------------
+from openpype.tools.utils.folders_widget import SingleSelectFoldersWidget
+from openpype.tools.utils.tasks_widget import TasksWidget
 
 from .delegates import ActionDelegate
 from . import lib

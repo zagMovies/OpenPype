@@ -3,20 +3,25 @@ from Qt import QtWidgets, QtCore, QtGui
 from avalon import style
 from avalon.vendor import qtawesome
 
-from .views import DeselectableTreeView
+from openpype.tools.utils.views import DeselectableTreeView
+from .client import (
+    get_tasks_by_folder_ids
+)
 
 
-TASK_NAME_ROLE = QtCore.Qt.UserRole + 1
-TASK_TYPE_ROLE = QtCore.Qt.UserRole + 2
-TASK_ORDER_ROLE = QtCore.Qt.UserRole + 3
-TASK_ASSIGNEE_ROLE = QtCore.Qt.UserRole + 4
+TASK_ID_ROLE = QtCore.Qt.UserRole + 1
+TASK_NAME_ROLE = QtCore.Qt.UserRole + 2
+TASK_TYPE_ROLE = QtCore.Qt.UserRole + 3
+TASK_ORDER_ROLE = QtCore.Qt.UserRole + 4
+TASK_ASSIGNEE_ROLE = QtCore.Qt.UserRole + 5
 
 
 class TasksModel(QtGui.QStandardItemModel):
-    """A model listing the tasks combined for a list of assets"""
-    def __init__(self, dbcon, parent=None):
+    """A model listing the tasks for a folder."""
+    def __init__(self, context, parent=None):
         super(TasksModel, self).__init__(parent=parent)
-        self.dbcon = dbcon
+
+        self._context = context
         self.setHeaderData(
             0, QtCore.Qt.Horizontal, "Tasks", QtCore.Qt.DisplayRole
         )
@@ -32,27 +37,24 @@ class TasksModel(QtGui.QStandardItemModel):
         self._project_task_types = {}
 
         self._empty_tasks_item = None
-        self._last_asset_id = None
+        self._last_folder_id = None
         self._loaded_project_name = None
 
     def _context_is_valid(self):
-        if self.dbcon.Session.get("AVALON_PROJECT"):
+        if self._context.project_name:
             return True
         return False
 
     def refresh(self):
         self._refresh_task_types()
-        self.set_asset_id(self._last_asset_id)
+        self.set_folder_id(self._last_folder_id)
 
     def _refresh_task_types(self):
         # Get the project configured icons from database
         task_types = {}
         if self._context_is_valid():
-            project = self.dbcon.find_one(
-                {"type": "project"},
-                {"config.tasks"}
-            )
-            task_types = project["config"].get("tasks") or task_types
+            # TODO use connection to get task types
+            pass
         self._project_task_types = task_types
 
     def _try_get_awesome_icon(self, icon_name):
@@ -104,14 +106,14 @@ class TasksModel(QtGui.QStandardItemModel):
 
         return icon
 
-    def set_asset_id(self, asset_id):
-        asset_doc = None
+    def set_folder_id(self, folder_id):
+        tasks_info = None
         if self._context_is_valid():
-            asset_doc = self.dbcon.find_one(
-                {"_id": asset_id},
-                {"data.tasks": True}
+            tasks_info = (
+                get_tasks_by_folder_ids(self._context.project_name, folder_id)
             )
-        self._set_asset(asset_doc)
+
+        self._set_folder_tasks(folder_id, tasks_info)
 
     def _get_empty_task_item(self):
         if self._empty_tasks_item is None:
@@ -121,25 +123,24 @@ class TasksModel(QtGui.QStandardItemModel):
             self._empty_tasks_item = item
         return self._empty_tasks_item
 
-    def _set_asset(self, asset_doc):
-        """Set assets to track by their database id
+    def _set_folder_tasks(self, folder_id, tasks_info):
+        """Set folders to track by their database id
 
         Arguments:
-            asset_doc (dict): Asset document from MongoDB.
+            folder (dict): Folder document from MongoDB.
         """
-        asset_tasks = {}
-        self._last_asset_id = None
-        if asset_doc:
-            asset_tasks = asset_doc.get("data", {}).get("tasks") or {}
-            self._last_asset_id = asset_doc["_id"]
+        self._last_folder_id = folder_id
+        tasks_info = tasks_info or []
 
         root_item = self.invisibleRootItem()
         root_item.removeRows(0, root_item.rowCount())
 
         items = []
-        for task_name, task_info in asset_tasks.items():
+        for task_info in tasks_info:
+            task_id = task_info["id"]
+            task_name = task_info["name"]
             task_icon = task_info.get("icon")
-            task_type = task_info.get("type")
+            task_type = task_info.get("taskType")
             task_order = task_info.get("order")
             task_type_info = self._project_task_types.get(task_type) or {}
             task_type_icon = task_type_info.get("icon")
@@ -154,6 +155,7 @@ class TasksModel(QtGui.QStandardItemModel):
 
             label = "{} ({})".format(task_name, task_type or "type N/A")
             item = QtGui.QStandardItem(label)
+            item.setData(task_id, TASK_ID_ROLE)
             item.setData(task_name, TASK_NAME_ROLE)
             item.setData(task_type, TASK_TYPE_ROLE)
             item.setData(task_order, TASK_ORDER_ROLE)
@@ -202,8 +204,8 @@ class TasksWidget(QtWidgets.QWidget):
 
     task_changed = QtCore.Signal()
 
-    def __init__(self, dbcon, parent=None):
-        self._dbcon = dbcon
+    def __init__(self, context, parent=None):
+        self._context = context
 
         super(TasksWidget, self).__init__(parent)
 
@@ -235,10 +237,10 @@ class TasksWidget(QtWidgets.QWidget):
     def _create_source_model(self):
         """Create source model of tasks widget.
 
-        Model must have available 'refresh' method and 'set_asset_id' to change
-        context of asset.
+        Model must have available 'refresh' method and 'set_folder_id' to
+        change context of folder.
         """
-        return TasksModel(self._dbcon)
+        return TasksModel(self._context)
 
     def _create_proxy_model(self, source_model):
         proxy = TasksProxyModel()
@@ -248,15 +250,15 @@ class TasksWidget(QtWidgets.QWidget):
     def refresh(self):
         self._tasks_model.refresh()
 
-    def set_asset_id(self, asset_id):
+    def set_folder_id(self, folder_id):
         # Try and preserve the last selected task and reselect it
-        # after switching assets. If there's no currently selected
-        # asset keep whatever the "last selected" was prior to it.
+        # after switching folders. If there's no currently selected
+        # folder keep whatever the "last selected" was prior to it.
         current = self.get_selected_task_name()
         if current:
             self._last_selected_task_name = current
 
-        self._tasks_model.set_asset_id(asset_id)
+        self._tasks_model.set_folder_id(folder_id)
 
         if self._last_selected_task_name:
             self.select_task_name(self._last_selected_task_name)
@@ -302,6 +304,17 @@ class TasksWidget(QtWidgets.QWidget):
         if last_selected_task_name:
             self._last_selected_task_name = last_selected_task_name
 
+    def _get_selected_index(self):
+        index = self._tasks_view.currentIndex()
+        selection_model = self._tasks_view.selectionModel()
+        if index.isValid() and selection_model.isSelected(index):
+            return index
+        return QtCore.QModelIndex()
+
+    def get_selected_task_id(self):
+        index = self._get_selected_index()
+        return index.data(TASK_ID_ROLE)
+
     def get_selected_task_name(self):
         """Return name of task at current index (selected)
 
@@ -309,18 +322,12 @@ class TasksWidget(QtWidgets.QWidget):
             str: Name of the current task.
 
         """
-        index = self._tasks_view.currentIndex()
-        selection_model = self._tasks_view.selectionModel()
-        if index.isValid() and selection_model.isSelected(index):
-            return index.data(TASK_NAME_ROLE)
-        return None
+        index = self._get_selected_index()
+        return index.data(TASK_NAME_ROLE)
 
     def get_selected_task_type(self):
-        index = self._tasks_view.currentIndex()
-        selection_model = self._tasks_view.selectionModel()
-        if index.isValid() and selection_model.isSelected(index):
-            return index.data(TASK_TYPE_ROLE)
-        return None
+        index = self._get_selected_index()
+        return index.data(TASK_TYPE_ROLE)
 
     def _on_task_change(self):
         self.task_changed.emit()
