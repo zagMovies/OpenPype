@@ -7,45 +7,14 @@ import requests
 import platform
 import shutil
 
-from common.openpype_common.distribution.file_handler import RemoteFileHandler
-
-
-class UrlType(Enum):
-    HTTP = "http"
-    GIT = "git"
-    FILESYSTEM = "filesystem"
+from .file_handler import RemoteFileHandler
+from .addon_info import AddonInfo
 
 
 class UpdateState(Enum):
     EXISTS = "exists"
     UPDATED = "updated"
     FAILED = "failed"
-
-
-@attr.s
-class MultiPlatformPath(object):
-    windows = attr.ib(default=None)
-    linux = attr.ib(default=None)
-    darwin = attr.ib(default=None)
-
-
-@attr.s
-class AddonSource(object):
-    type = attr.ib()
-    url = attr.ib(default=None)
-    path = attr.ib(default=attr.Factory(MultiPlatformPath))
-
-
-@attr.s
-class AddonInfo(object):
-    """Object matching json payload from Server"""
-    name = attr.ib()
-    version = attr.ib()
-    sources = attr.ib(default=attr.Factory(list), type=AddonSource)
-    hash = attr.ib(default=None)
-    description = attr.ib(default=None)
-    license = attr.ib(default=None)
-    authors = attr.ib(default=None)
 
 
 class AddonDownloader:
@@ -71,7 +40,7 @@ class AddonDownloader:
         Args:
             source (dict): {type:"http", "url":"https://} ...}
             destination (str): local folder to unzip
-        Retursn:
+        Returns:
             (str) local path to addon zip file
         """
         pass
@@ -199,8 +168,9 @@ def update_addon_state(addon_infos, destination_folder, factory,
         for source in addon.sources:
             download_states[full_name] = UpdateState.FAILED.value
             try:
-                downloader = factory.get_downloader(source["type"])
-                zip_file_path = downloader.download(source, addon_dest)
+                downloader = factory.get_downloader(source.type)
+                zip_file_path = downloader.download(attr.asdict(source),
+                                                    addon_dest)
                 downloader.check_hash(zip_file_path, addon.hash)
                 downloader.unzip(zip_file_path, addon_dest)
                 download_states[full_name] = UpdateState.UPDATED.value
@@ -235,4 +205,4 @@ def check_addons(server_endpoint, addon_folder, downloaders):
 
 
 def cli(*args):
-    raise NotImplemented
+    raise NotImplementedError
