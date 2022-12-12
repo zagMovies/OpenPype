@@ -21,7 +21,7 @@ const services = [
     title: <>Supported</>,
     description: (
       <>
-        OpenPYPE is developed and maintained by PYPE.club, a full-time, dedicated team of industry professionals, providing support and training to studios and artists.
+        OpenPYPE was developed and maintained by PYPE.club, a full-time, dedicated team of industry professionals, providing support and training to studios and artists.
       </>
     ),
   },
@@ -228,43 +228,10 @@ function Home() {
             <img src="img/logos/openpype_color.svg"></img>
           </h1>
           <h2><small className={styles.hero__subtitle}>{siteConfig.tagline}</small></h2>
-          <div className={styles.buttons}>
-            <Link
-              className={classnames(
-                'button button--outline button--primary',
-                styles.button,
-              )}
-              to={'https://github.com/pypeclub/pype'}>
-              Contribute
-            </Link>
-            <Link
-              className={classnames(
-                'button button--outline button--primary',
-                styles.button,
-              )}
-              to={'mailto:info@pype.club'}>
-              Get in touch
-            </Link>
-            <Link
-              className={classnames(
-                'button button--outline button--primary',
-                styles.button,
-              )}
-              to={'https://discord.gg/sFNPWXG'}>
-              Join our chat
-            </Link>
-            <Link
-              className={classnames(
-                'button button--outline button--primary',
-                styles.button,
-              )}
-              to={'https://pype.club'}>
-              Get Support
-            </Link>
-          </div>
+
 
           <p>
-          OpenPYPE is developed, maintained and supported by <b><a href="https://pype.club">PYPE.club</a></b> </p>
+          OpenPYPE was developed, maintained and supported by <b><a href="https://pype.club">PYPE.club</a></b> </p>
 
         </div>
       </header>
@@ -439,74 +406,10 @@ function Home() {
                 </a>
 
               </div>
-
-              <p> <b>Planned or in development by us and OpenPype community.</b></p>
-
-              <div className={classnames('showcase',)}>
-			  
-                <a className="link" href="https://fatfi.sh/aquarium/en">
-                  <img src="/img/app_aquarium.png" alt="" title=""></img>
-                  <span className="caption">Aquarium</span>
-                </a>
-
-                <a className="link" href="https://www.vvertex.com">
-                  <img src="/img/app_muster.png" alt="" title=""></img>
-                  <span className="caption">Muster</span>
-                </a>
-
-                <a className="link" href="https://www.hibob.com">
-                  <img src="/img/app_hibob.png" alt="Hi Bob" title="Hi Bob"></img>
-                  <span className="caption">Bob</span>
-                </a>
-
-              </div>
           </div>
         </section>
 
-          <section className={styles.collaborators}>
-            <div className="">
-              <h2>Maintainers</h2>
-              <div className="showcase">
-                  <a className="pype_logo" href="https://pype.club">
-                        <img src="/img/logos/pypeclub_black.svg" alt="" title="pype.club"></img>
-                    </a>
-              </div>
-            </div>
-          </section>
-
-        {collab && collab.length && (
-          <section className={styles.collaborators}>
-            <div className="">
-              <h2>Contributors</h2>
-              <div className="showcase">
-                {collab.map((props, idx) => (
-                  <Collaborator key={idx} {...props} />
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-
-        {studios && studios.length && (
-          <section className={styles.gallery}>
-            <div className="container">
-              <h2>Studios using openPype</h2>
-              <div className="showcase">
-                {studios.map((props, idx) => (
-                  <Studio key={idx} {...props} />
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-
-
-      <div className="container">
-        <BadgesSection/>
-      </div>
-
+          
 
       </main>
     </Layout>
