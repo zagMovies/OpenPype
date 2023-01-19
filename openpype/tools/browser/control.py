@@ -3,7 +3,12 @@ import collections
 from abc import ABCMeta, abstractmethod, abstractproperty
 import six
 
-from openpype.client import get_projects, get_assets
+from openpype.client import (
+    get_projects,
+    get_assets,
+    get_subsets,
+    get_versions
+)
 from openpype.lib.events import EventSystem
 
 
@@ -71,18 +76,85 @@ class HierarchyItem:
         )
 
 
+class VersionItem:
+    def __init__(
+        self,
+        version_id,
+        subset_id,
+        version,
+        is_hero
+    ):
+        self.version_id = version_id
+        self.subset_id = subset_id
+        self.version = version
+        self.is_hero = is_hero
+
+    @classmethod
+    def from_doc(cls, versions_doc):
+        is_hero = versions_doc["type"] == "hero_version"
+        return cls(
+            str(versions_doc["_id"]),
+            str(versions_doc["parent"]),
+            versions_doc["name"],
+            is_hero
+        )
+
+
+class SubsetItem:
+    def __init__(
+        self,
+        subset_id,
+        asset_id,
+        subset_name,
+        group_name,
+        versions
+    ):
+        self.subset_id = subset_id
+        self.asset_id = asset_id
+        self.subset_name = subset_name
+        self.group_name = group_name
+        self.versions = versions
+
+    @classmethod
+    def from_docs(cls, subset_doc, versions_docs):
+        hero_version = None
+        versions_by_id = {}
+        for versions_doc in versions_docs:
+            versions_by_id[versions_doc["_id"]] = versions_doc
+            if versions_doc["type"] == "hero_version":
+                hero_version = versions_doc
+
+        if hero_version:
+            match_version = versions_by_id.get(hero_version["version_id"])
+            if match_version:
+                hero_version["name"] = match_version["name"]
+            else:
+                versions_by_id.pop(hero_version["_id"])
+        versions = [
+            VersionItem.from_doc(versions_doc)
+            for versions_doc in versions_by_id.values()
+        ]
+        return cls(
+            str(subset_doc["_id"]),
+            str(subset_doc["parent"]),
+            subset_doc["name"],
+            subset_doc["data"].get("group"),
+            versions
+        )
+
+
 class EntityModel:
     def __init__(self, controller):
         self._controller = controller
         self._projects = set()
         self._hierarchy_items_by_project = {None: {}}
-        self._version_items_by_project = {None: {}}
+        self._subset_items_by_project = {None: {}}
         self._repre_items_by_project = {None: {}}
 
     def clear_cache(self):
         self._projects = set()
         self._hierarchy_items_by_project = {None: {}}
-        self._version_items_by_project = {None: {}}
+        self._subset_items_by_project = {None: {}}
         self._repre_items_by_project = {None: {}}
 
     def _emit_event(self, topic, data=None):
@@ -134,13 +206,38 @@ class EntityModel:
         self._refresh_hierarchy(project_name)
         self._emit_event("model.hierarchy.refresh.finished")
 
-    def _refresh_versions(self, project_name, asset_ids):
-        pass
+    def _refresh_subsets(self, project_name, asset_ids):
+        subset_docs = []
+        version_docs = []
+        if asset_ids:
+            subset_docs = list(get_subsets(
+                project_name,
+                asset_ids=asset_ids,
+                fields=["_id", "parent", "name", "data.group"]
+            ))
 
-    def refresh_versions(self, project_name, asset_ids):
-        self._emit_event("model.versions.refresh.started")
-        self._refresh_versions(project_name, asset_ids)
-        self._emit_event("model.versions.refresh.finished")
+        subset_ids = [subset_doc["_id"] for subset_doc in subset_docs]
+        if subset_ids:
+            version_docs = list(get_versions(
+                project_name,
+                subset_ids=subset_ids,
+                fields=["_id", "type", "parent", "name", "version_id"]
+            ))
+        versions_by_subset_id = collections.defaultdict(list)
+        for version_doc in version_docs:
+            versions_by_subset_id[version_doc["parent"]].append(version_doc)
+
+        subset_items_by_id = {}
+        for subset_doc in subset_docs:
+            version_docs = versions_by_subset_id[subset_doc["_id"]]
+            item = SubsetItem.from_docs(subset_doc, version_docs)
+            subset_items_by_id[item.subset_id] = subset_items_by_id
+        self._subset_items_by_project[project_name] = subset_items_by_id
+
+    def refresh_subsets(self, project_name, asset_ids):
+        self._emit_event("model.subsets.refresh.started")
+        self._refresh_subsets(project_name, asset_ids)
+        self._emit_event("model.subsets.refresh.finished")
 
     def refresh_representations(self, project_name, asset_ids, version_ids):
         self._emit_event("model.representations.refresh.started")
@@ -194,7 +291,7 @@ class SelectionModel:
     def set_selected_versions(self, subset_ids, version_ids):
         if self._selected_versions == version_ids:
             return
-
+        self._selected_subsets = set(subset_ids)
         self._selected_versions = set(version_ids)
         self._emit_event(
             "selection.subsets.changed",
@@ -245,7 +342,9 @@ class BrowserController(BaseController):
         self._entity_model.refresh_hierarchy(event["project_name"])
 
     def _on_assets_change(self, event):
-        print(event.data)
+        self._entity_model.refresh_subsets(
+            self.get_selected_project(), event["asset_ids"]
+        )
 
     def reset(self):
         self._emit_event("controller.reset.started")
