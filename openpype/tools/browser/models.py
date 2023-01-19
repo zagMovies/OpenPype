@@ -183,5 +183,8 @@ class HierarchyModel(QtGui.QStandardItemModel):
                 continue
             parent = item.parent()
             if parent is None:
+                index = item.index()
+                if not index.isValid():
+                    continue
                 parent = root_item
             parent.takeRow(item.row())
