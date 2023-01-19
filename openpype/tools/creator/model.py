@@ -23,6 +23,8 @@ class CreatorsModel(QtGui.QStandardItemModel):
         items = []
         creators = discover_legacy_creator_plugins()
         for creator in creators:
+            if not creator.enabled:
+                continue
             item_id = str(uuid.uuid4())
             self._creators_by_id[item_id] = creator
 
@@ -36,7 +38,7 @@ class CreatorsModel(QtGui.QStandardItemModel):
         if not items:
             item = QtGui.QStandardItem("No registered families")
             item.setEnabled(False)
-            item.setData(QtCore.Qt.ItemIsEnabled, False)
+            item.setData(False, QtCore.Qt.ItemIsEnabled)
             items.append(item)
 
         self.invisibleRootItem().appendRows(items)
