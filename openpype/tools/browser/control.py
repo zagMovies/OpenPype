@@ -37,25 +37,37 @@ class AbstractController:
 
 
 class HierarchyItem:
-    def __init__(self, item_id, parent_id, name, label):
-        self.id = item_id
+    def __init__(
+        self,
+        entity_id,
+        name,
+        icon_name,
+        icon_color,
+        parent_id,
+        label,
+        has_children
+    ):
+        self.id = entity_id
         self.name = name
         self.label = label or name
+        self.icon_name = icon_name
+        self.icon_color = icon_color
         self.parent_id = parent_id
+        self.has_children = has_children
 
     @classmethod
-    def from_asset_doc(cls, asset_doc):
-        asset_data = asset_doc.get("data") or {}
-        label = asset_data.get("label")
-        parent_id = asset_data["visualParent"]
+    def from_doc(cls, asset_doc, has_children=True):
+        parent_id = asset_doc["data"].get("visualParent")
         if parent_id is not None:
             parent_id = str(parent_id)
-
         return cls(
             str(asset_doc["_id"]),
-            parent_id,
             asset_doc["name"],
-            label,
+            asset_doc["data"].get("icon"),
+            asset_doc["data"].get("color"),
+            parent_id,
+            asset_doc["data"].get("label"),
+            has_children,
         )
 
 
@@ -63,29 +75,15 @@ class EntityModel:
     def __init__(self, controller):
         self._controller = controller
         self._projects = set()
-        self._hierarchy_items = {}
-        self._subsets = {}
-        self._versions = {}
-        self._representation = {}
+        self._hierarchy_items_by_project = {None: {}}
+        self._version_items_by_project = {None: {}}
+        self._repre_items_by_project = {None: {}}
 
-        controller.event_system.add_callback(
-            "selection.project.changed",
-            self._on_project_change
-        )
-        controller.event_system.add_callback(
-            "selection.assets.changed",
-            self._on_project_change
-        )
-
-    def refresh(self):
+    def clear_cache(self):
         self._projects = set()
-        self._hierarchy_items = {}
-        self._subsets = {}
-        self._versions = {}
-        self._representations = {}
-        self.refresh_projects()
-        self.refresh_hierarchy()
-        self.refresh_versions()
+        self._hierarchy_items_by_project = {None: {}}
+        self._version_items_by_project = {None: {}}
+        self._repre_items_by_project = {None: {}}
 
     def _emit_event(self, topic, data=None):
         self._controller.event_system.emit(topic, data or {}, "model")
@@ -93,8 +91,10 @@ class EntityModel:
     def get_project_names(self):
         return set(self._projects)
 
-    def get_hierarchy_items(self):
-        return list(self._hierarchy_items.values())
+    def get_hierarchy_items(self, project_name):
+        if project_name not in self._hierarchy_items_by_project:
+            self.refresh_hierarchy(project_name)
+        return dict(self._hierarchy_items_by_project[project_name])
 
     def refresh_projects(self):
         self._emit_event("model.projects.refresh.started")
@@ -105,43 +105,46 @@ class EntityModel:
         }
         self._emit_event("model.projects.refresh.finished")
 
-    def refresh_hierarchy(self, project_name=-1):
-        self._emit_event("model.hierarchy.refresh.started")
-        items = {}
-        if project_name == -1:
-            project_name = self._controller.get_selected_project()
-        if project_name:
-            for asset_doc in get_assets(project_name):
-                item = HierarchyItem.from_asset_doc(asset_doc)
-                items[item.id] = item
-        self._hierarchy_items = items
+    def _refresh_hierarchy(self, project_name):
+        if not project_name:
+            return
+        hierarchy_items_by_id = {}
+        self._hierarchy_items_by_project[project_name] = hierarchy_items_by_id
 
+        asset_docs_by_parent_id = collections.defaultdict(list)
+        for asset_doc in get_assets(project_name):
+            parent_id = asset_doc["data"].get("visualParent")
+            asset_docs_by_parent_id[parent_id].append(asset_doc)
+
+        hierarchy_queue = collections.deque()
+        for asset_doc in asset_docs_by_parent_id[None]:
+            hierarchy_queue.append(asset_doc)
+
+        while hierarchy_queue:
+            asset_doc = hierarchy_queue.popleft()
+            children = asset_docs_by_parent_id[asset_doc["_id"]]
+            hierarchy_item = HierarchyItem.from_doc(
+                asset_doc, len(children) > 0)
+            hierarchy_items_by_id[hierarchy_item.id] = hierarchy_item
+            for child in children:
+                hierarchy_queue.append(child)
+
+    def refresh_hierarchy(self, project_name):
+        self._emit_event("model.hierarchy.refresh.started")
+        self._refresh_hierarchy(project_name)
         self._emit_event("model.hierarchy.refresh.finished")
 
-    def refresh_subsets(self):
-        self._emit_event("model.subsets.refresh.started")
-        self._emit_event("model.subsets.refresh.finished")
+    def _refresh_versions(self, project_name, asset_ids):
+        pass
 
-    def refresh_versions(self):
+    def refresh_versions(self, project_name, asset_ids):
         self._emit_event("model.versions.refresh.started")
+        self._refresh_versions(project_name, asset_ids)
         self._emit_event("model.versions.refresh.finished")
 
-    def refresh_representations(self):
+    def refresh_representations(self, project_name, asset_ids, version_ids):
         self._emit_event("model.representations.refresh.started")
         self._emit_event("model.representations.refresh.finished")
-
-    def _on_project_change(self, event):
-        self._hierarchy_items = {}
-        self._subsets = {}
-        self._versions = {}
-        self._representations = {}
-        self._emit_event("model.hierarchy.cleared")
-        self._emit_event("model.subsets.cleared")
-        self._emit_event("model.versions.cleared")
-        self._emit_event("model.representations.cleared")
-        self.refresh_hierarchy(event["new"])
-        self.refresh_subsets()
-        self.refresh_versions()
 
 
 class SelectionModel:
@@ -172,48 +175,36 @@ class SelectionModel:
         if self._selected_project == project_name:
             return
 
-        old_value = self._selected_project
         self._selected_project = project_name
         self._emit_event(
             "selection.project.changed",
-            {"old": old_value, "new": project_name}
+            {"project_name": project_name}
         )
 
-    def set_selected_assets(self, asset_ids):
+    def set_selected_asset_ids(self, asset_ids):
         if self._selected_assets == asset_ids:
             return
 
-        old_value = self._selected_assets
         self._selected_assets = set(asset_ids)
         self._emit_event(
             "selection.assets.changed",
-            {
-                "old": old_value,
-                "new": set(asset_ids),
-                "project_name": self._selected_project
-            }
+            {"asset_ids": set(asset_ids)}
         )
 
     def set_selected_versions(self, subset_ids, version_ids):
         if self._selected_versions == version_ids:
             return
 
-        old_value = self._selected_subsets
-        self._emit_event(
-            "selection.subsets.changed",
-            {"old": old_value, "new": set(subset_ids)}
-        )
-        old_value = self._selected_versions
         self._selected_versions = set(version_ids)
         self._emit_event(
-            "selection.versions.changed",
-            {"old": old_value, "new": set(version_ids)}
+            "selection.subsets.changed",
+            {"subset_ids": set(subset_ids), "version_ids": set(version_ids)}
         )
 
 
 class BaseController(AbstractController):
     def __init__(self):
-        self._event_system = None
+        self._event_system = self._create_event_system()
         self._log = None
 
     @property
@@ -222,18 +213,16 @@ class BaseController(AbstractController):
             self._log = logging.getLogger(self.__class__.__name__)
         return self._log
 
+    def _create_event_system(self):
+        return EventSystem()
+
     def _emit_event(self, topic, data=None):
         self.event_system.emit(topic, data or {}, "controller")
 
     @property
     def event_system(self):
-        """Inner event system for publisher controller.
+        """Inner event system for publisher controller."""
 
-        Is used for communication with UI. Event system is autocreated.
-        """
-
-        if self._event_system is None:
-            self._event_system = EventSystem()
         return self._event_system
 
 
@@ -243,9 +232,25 @@ class BrowserController(BaseController):
         self._selection_model = SelectionModel(self)
         self._entity_model = EntityModel(self)
 
+        self.event_system.add_callback(
+            "selection.project.changed",
+            self._on_project_change
+        )
+        self.event_system.add_callback(
+            "selection.assets.changed",
+            self._on_assets_change
+        )
+
+    def _on_project_change(self, event):
+        self._entity_model.refresh_hierarchy(event["project_name"])
+
+    def _on_assets_change(self, event):
+        print(event.data)
+
     def reset(self):
         self._emit_event("controller.reset.started")
-        self._entity_model.refresh()
+        self._entity_model.clear_cache()
+        self._entity_model.refresh_projects()
         self._emit_event("controller.reset.finished")
 
     def get_current_project(self):
@@ -256,7 +261,8 @@ class BrowserController(BaseController):
         return self._entity_model.get_project_names()
 
     def get_hierarchy_items(self):
-        return self._entity_model.get_hierarchy_items()
+        project_name = self.get_selected_project()
+        return self._entity_model.get_hierarchy_items(project_name)
 
     # Selection model wrappers
     def get_selected_project(self):
@@ -264,3 +270,10 @@ class BrowserController(BaseController):
 
     def set_selected_project(self, project_name):
         self._selection_model.set_selected_project(project_name)
+
+    # Selection model wrappers
+    def get_selected_asset_ids(self):
+        return self._selection_model.get_selected_asset_ids()
+
+    def set_selected_asset_ids(self, asset_ids):
+        self._selection_model.set_selected_asset_ids(asset_ids)

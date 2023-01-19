@@ -83,6 +83,10 @@ class ProjectsModel(QtGui.QStandardItemModel):
         for project_name in project_names:
             if project_name not in self._items_by_name:
                 item = QtGui.QStandardItem(project_name)
+                item.setFlags(
+                    QtCore.Qt.ItemIsSelectable
+                    | QtCore.Qt.ItemIsEnabled
+                )
                 item.setData(project_name, PROJECT_NAME_ROLE)
                 self._items_by_name[project_name] = item
                 new_items.append(item)
@@ -119,26 +123,29 @@ class HierarchyModel(QtGui.QStandardItemModel):
             self._on_hierarchy_clear
         )
 
-    def _on_hierarchy_clear(self):
-        self.clear()
+    def _clear(self):
+        root_item = self.invisibleRootItem()
+        for row in reversed(range(root_item.rowCount())):
+            item = root_item.child(row)
+            root_item.removeRow(item.row())
+
         self._items_by_id = {}
 
+    def _on_hierarchy_clear(self):
+        self._clear()
+
     def refresh(self):
-        hierarchy_items = self._controller.get_hierarchy_items()
+        hierarchy_items_by_id = self._controller.get_hierarchy_items()
         hierarchy_items_by_parent_id = collections.defaultdict(list)
-        item_ids = set()
-        for hierarchy_item in hierarchy_items:
-            item_ids.add(hierarchy_item.id)
+        for hierarchy_item in hierarchy_items_by_id.values():
             hierarchy_items_by_parent_id[hierarchy_item.parent_id].append(
                 hierarchy_item
             )
 
-        ids_to_remove = set(self._items_by_id.keys()) - item_ids
-        for item_id in ids_to_remove:
-            item = self._items_by_id.pop(item_id)
-            parent = item.parent()
-            if parent is not None:
-                parent.removeRow(item.row())
+        ids_to_remove = (
+            set(self._items_by_id.keys())
+            - set(hierarchy_items_by_id.keys())
+        )
 
         root_item = self.invisibleRootItem()
         items_queue = collections.deque()
@@ -149,16 +156,17 @@ class HierarchyModel(QtGui.QStandardItemModel):
             new_items = []
             for hierarchy_item in hierarchy_items_by_parent_id[parent_id]:
                 item_id = hierarchy_item.id
-                item_ids.add(item_id)
-                if item_id in self._items_by_id:
-                    item = self._items_by_id[item_id]
-                    _parent_item = item.parent()
-                    if _parent_item is not parent_item:
-                        _parent_item.takeChild(item.row())
-                        new_items.append(item)
-                else:
+                item = self._items_by_id.get(item_id)
+                if item is None:
                     item = QtGui.QStandardItem()
+                    item.setFlags(
+                        QtCore.Qt.ItemIsSelectable
+                        | QtCore.Qt.ItemIsEnabled
+                    )
+                    new_items.append(item)
                     self._items_by_id[item_id] = item
+
+                elif item.parent() is not parent_item:
                     new_items.append(item)
 
                 item.setData(hierarchy_item.label, QtCore.Qt.DisplayRole)
@@ -168,3 +176,12 @@ class HierarchyModel(QtGui.QStandardItemModel):
 
             if new_items:
                 parent_item.appendRows(new_items)
+
+        for item_id in ids_to_remove:
+            item = self._items_by_id.pop(item_id, None)
+            if item is None:
+                continue
+            parent = item.parent()
+            if parent is None:
+                parent = root_item
+            parent.takeRow(item.row())

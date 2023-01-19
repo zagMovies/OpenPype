@@ -3,7 +3,12 @@ from qtpy import QtWidgets, QtCore, QtGui
 from openpype.style import load_stylesheet
 
 from .control import BrowserController
-from .models import ProjectsModel, PROJECT_NAME_ROLE, HierarchyModel
+from .models import (
+    ProjectsModel,
+    HierarchyModel,
+    PROJECT_NAME_ROLE,
+    ASSET_ID_ROLE,
+)
 
 
 class BrowserWindow(QtWidgets.QWidget):
@@ -63,6 +68,9 @@ class BrowserWindow(QtWidgets.QWidget):
 
         show_timer.timeout.connect(self._on_show_timer)
         projects_combobox.currentIndexChanged.connect(self._on_project_change)
+        assets_view.selectionModel().selectionChanged.connect(
+            self._on_asset_selection_change
+        )
 
         self._projects_combobox = projects_combobox
 
@@ -108,3 +116,11 @@ class BrowserWindow(QtWidgets.QWidget):
         idx = self._projects_combobox.currentIndex()
         project_name = self._projects_combobox.itemData(idx, PROJECT_NAME_ROLE)
         self._controller.set_selected_project(project_name)
+
+    def _on_asset_selection_change(self, selection, _):
+        asset_ids = set()
+        for idx in selection.indexes():
+            asset_id = idx.data(ASSET_ID_ROLE)
+            if asset_id:
+                asset_ids.add(asset_id)
+        self._controller.set_selected_asset_ids(asset_ids)
