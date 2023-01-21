@@ -441,9 +441,18 @@ class SubsetsModel(QtGui.QStandardItemModel):
         if role == QtCore.Qt.DecorationRole:
             return None
 
+        if (
+            role == VERSION_NAME_EDIT_ROLE
+            or (role == QtCore.Qt.EditRole and col == self.version_col)
+        ):
+            index = self.index(index.row(), 0, index.parent())
+            subset_id = index.data(SUBSET_ID_ROLE)
+            subset_item = self._subset_items_by_id.get(subset_id)
+            if subset_item is None:
+                return None
+            return subset_item.versions
+
         if role == QtCore.Qt.EditRole:
-            if col == self.version_col:
-                role = VERSION_NAME_EDIT_ROLE
             return None
 
         if role == QtCore.Qt.DisplayRole:
@@ -465,7 +474,10 @@ class SubsetsModel(QtGui.QStandardItemModel):
             return False
 
         col = index.column()
-        if col == self.version_col and role == QtCore.Qt.EditRole:
+        if (
+            role == VERSION_NAME_EDIT_ROLE
+            or (col == self.version_col and role == QtCore.Qt.EditRole)
+        ):
             index = self.index(index.row(), 0, index.parent())
             subset_id = index.data(SUBSET_ID_ROLE)
             subset_item = self._subset_items_by_id[subset_id]

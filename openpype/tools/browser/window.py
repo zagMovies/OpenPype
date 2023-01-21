@@ -1,4 +1,4 @@
-from qtpy import QtWidgets, QtCore, QtGui
+from qtpy import QtWidgets, QtCore
 
 from openpype.style import load_stylesheet
 
@@ -10,6 +10,7 @@ from .models import (
     PROJECT_NAME_ROLE,
     ASSET_ID_ROLE,
 )
+from .delegates import VersionDelegate
 
 
 class BrowserWindow(QtWidgets.QWidget):
@@ -59,6 +60,10 @@ class BrowserWindow(QtWidgets.QWidget):
         subsets_model = SubsetsModel(controller)
         subsets_view.setModel(subsets_model)
 
+        version_delegate = VersionDelegate()
+        subsets_view.setItemDelegateForColumn(
+            subsets_model.version_col, version_delegate)
+
         subsets_layout = QtWidgets.QVBoxLayout(subsets_widget)
         subsets_layout.setContentsMargins(0, 0, 0, 0)
         subsets_layout.addWidget(subsets_filter_input, 0)
@@ -91,6 +96,7 @@ class BrowserWindow(QtWidgets.QWidget):
         self._subsets_filter_input = subsets_filter_input
         self._subsets_view = subsets_view
         self._subsets_model = subsets_model
+        self._version_delegate = version_delegate
 
         self._controller = controller
         self._first_show = True
