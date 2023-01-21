@@ -138,6 +138,15 @@ class SubsetItem:
         self.subset_name = subset_name
         self.group_name = group_name
         self.versions = versions
+        self._versions_by_id = None
+
+    def get_version_by_id(self, version_id):
+        if self._versions_by_id is None:
+            self._versions_by_id = {
+                version.version_id: version
+                for version in self.versions
+            }
+        return self._versions_by_id.get(version_id)
 
     @classmethod
     def from_docs(cls, subset_doc, versions_docs):
