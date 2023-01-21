@@ -179,13 +179,13 @@ class SubsetItem:
 class EntityModel:
     def __init__(self, controller):
         self._controller = controller
-        self._projects = set()
+        self._projects = None
         self._hierarchy_items_by_project = {None: {}}
         self._subset_items_by_project = {None: {}}
         self._repre_items_by_project = {None: {}}
 
     def clear_cache(self):
-        self._projects = set()
+        self._projects = None
         self._hierarchy_items_by_project = {None: {}}
         self._subset_items_by_project = {None: {}}
         self._repre_items_by_project = {None: {}}
@@ -194,11 +194,13 @@ class EntityModel:
         self._controller.event_system.emit(topic, data or {}, "model")
 
     def get_project_names(self):
+        if self._projects is None:
+            return None
         return set(self._projects)
 
     def get_hierarchy_items(self, project_name):
         if project_name not in self._hierarchy_items_by_project:
-            self.refresh_hierarchy(project_name)
+            return None
         return dict(self._hierarchy_items_by_project[project_name])
 
     def refresh_projects(self):
@@ -390,7 +392,11 @@ class BrowserController(BaseController):
 
     # Entity model wrappers
     def get_project_names(self):
-        return self._entity_model.get_project_names()
+        project_names = self._entity_model.get_project_names()
+        if project_names is None:
+            self._entity_model.refresh_projects()
+            return self._entity_model.get_project_names()
+        return project_names
 
     def get_hierarchy_items(self):
         project_name = self.get_selected_project()
