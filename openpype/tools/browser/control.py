@@ -203,6 +203,15 @@ class EntityModel:
             return None
         return dict(self._hierarchy_items_by_project[project_name])
 
+    def get_subset_items(self, project_name, asset_ids):
+        asset_ids_cache = self._subset_items_by_project.get(project_name, {})
+        output = {}
+        for asset_id in asset_ids:
+            subset_items = asset_ids_cache.get(asset_id)
+            if subset_items:
+                output.update(subset_items)
+        return output
+
     def refresh_projects(self):
         self._emit_event("model.projects.refresh.started")
 
@@ -242,12 +251,22 @@ class EntityModel:
         self._emit_event("model.hierarchy.refresh.finished")
 
     def _refresh_subsets(self, project_name, asset_ids):
+        if project_name not in self._subset_items_by_project:
+            self._subset_items_by_project[project_name] = {}
+
+        asset_ids_cache = self._subset_items_by_project[project_name]
+        asset_ids_to_query = set()
+        for asset_id in asset_ids:
+            if asset_id not in asset_ids_cache:
+                asset_ids_to_query.add(asset_id)
+                asset_ids_cache[asset_id] = {}
+
         subset_docs = []
         version_docs = []
-        if asset_ids:
+        if asset_ids_to_query:
             subset_docs = list(get_subsets(
                 project_name,
-                asset_ids=asset_ids,
+                asset_ids=asset_ids_to_query,
                 fields=["_id", "parent", "name", "data.group"]
             ))
 
@@ -262,12 +281,11 @@ class EntityModel:
         for version_doc in version_docs:
             versions_by_subset_id[version_doc["parent"]].append(version_doc)
 
-        subset_items_by_id = {}
         for subset_doc in subset_docs:
+            asset_id = str(subset_doc["parent"])
             version_docs = versions_by_subset_id[subset_doc["_id"]]
             item = SubsetItem.from_docs(subset_doc, version_docs)
-            subset_items_by_id[item.subset_id] = subset_items_by_id
-        self._subset_items_by_project[project_name] = subset_items_by_id
+            asset_ids_cache[asset_id][item.subset_id] = item
 
     def refresh_subsets(self, project_name, asset_ids):
         self._emit_event("model.subsets.refresh.started")
@@ -401,6 +419,11 @@ class BrowserController(BaseController):
     def get_hierarchy_items(self):
         project_name = self.get_selected_project()
         return self._entity_model.get_hierarchy_items(project_name)
+
+    def get_subset_items(self):
+        project_name = self.get_selected_project()
+        asset_ids = self.get_selected_asset_ids()
+        return self._entity_model.get_subset_items(project_name, asset_ids)
 
     # Selection model wrappers
     def get_selected_project(self):
