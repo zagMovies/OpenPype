@@ -89,6 +89,29 @@ class VersionItem:
         self.version = version
         self.is_hero = is_hero
 
+    def __eq__(self, other):
+        if not isinstance(other, VersionItem):
+            return False
+        return (
+            self.is_hero == other.is_hero
+            and self.version == other.version
+            and self.version_id == other.version_id
+            and self.subset_id == other.subset_id
+        )
+
+    def __gt__(self, other):
+        if not isinstance(other, VersionItem):
+            return False
+        if (
+            other.version == self.version
+            and self.is_hero
+        ):
+            return True
+        return other.version < self.version
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     @classmethod
     def from_doc(cls, versions_doc):
         is_hero = versions_doc["type"] == "hero_version"
@@ -109,6 +132,7 @@ class SubsetItem:
         group_name,
         versions
     ):
+        versions.sort()
         self.subset_id = subset_id
         self.asset_id = asset_id
         self.subset_name = subset_name
