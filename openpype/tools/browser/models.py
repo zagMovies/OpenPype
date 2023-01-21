@@ -13,6 +13,14 @@ VERSION_ID_ROLE = QtCore.Qt.UserRole + 9
 VERSION_HERO_ROLE = QtCore.Qt.UserRole + 10
 VERSION_NAME_ROLE = QtCore.Qt.UserRole + 11
 VERSION_NAME_EDIT_ROLE = QtCore.Qt.UserRole + 12
+VERSION_PUBLISH_TIME_ROLE = QtCore.Qt.UserRole + 13
+VERSION_AUTHOR_ROLE = QtCore.Qt.UserRole + 14
+VERSION_FRAME_RANGE_ROLE = QtCore.Qt.UserRole + 15
+VERSION_DURATION_ROLE = QtCore.Qt.UserRole + 16
+VERSION_HANDLES_ROLE = QtCore.Qt.UserRole + 17
+VERSION_STEP_ROLE = QtCore.Qt.UserRole + 18
+VERSION_IN_SCENE_ROLE = QtCore.Qt.UserRole + 19
+VERSION_AVAILABLE_ROLE = QtCore.Qt.UserRole + 20
 
 
 class ProjectsModel(QtGui.QStandardItemModel):
@@ -218,6 +226,7 @@ class SubsetsModel(QtGui.QStandardItemModel):
         for idx, label in enumerate(column_labels)
     }
     version_col = column_labels.index("Version")
+    published_time_col = column_labels.index("Time")
 
     def __init__(self, controller):
         super().__init__()
@@ -305,9 +314,28 @@ class SubsetsModel(QtGui.QStandardItemModel):
         return model_item
 
     def _set_version_data_to_subset_item(self, model_item, version_item):
+        """
+
+        Args:
+            model_item (QtGui.QStandardItem): Item which should have values
+                from version item.
+            version_item (VersionItem): Item from entities model with
+                information about version.
+        """
+
+        model_item.setData(version_item.version_id, VERSION_ID_ROLE)
         model_item.setData(version_item.version, VERSION_NAME_ROLE)
         model_item.setData(version_item.version_id, VERSION_ID_ROLE)
         model_item.setData(version_item.is_hero, VERSION_HERO_ROLE)
+        model_item.setData(
+            version_item.published_time, VERSION_PUBLISH_TIME_ROLE
+        )
+        model_item.setData(version_item.author, VERSION_AUTHOR_ROLE)
+        model_item.setData(version_item.frame_range, VERSION_FRAME_RANGE_ROLE)
+        model_item.setData(version_item.duration, VERSION_DURATION_ROLE)
+        model_item.setData(version_item.handles, VERSION_HANDLES_ROLE)
+        model_item.setData(version_item.step, VERSION_STEP_ROLE)
+        model_item.setData(version_item.in_scene, VERSION_IN_SCENE_ROLE)
 
     def _get_subset_model_item(self, subset_item):
         model_item = self._items_by_id.get(subset_item.subset_id)
@@ -317,9 +345,11 @@ class SubsetsModel(QtGui.QStandardItemModel):
         if model_item is None:
             subset_id = subset_item.subset_id
             model_item = QtGui.QStandardItem(subset_item.subset_name)
-            model_item.setData(subset_item.subset_name, SUBSET_NAME_ROLE)
             model_item.setData(subset_id, SUBSET_ID_ROLE)
+            model_item.setData(subset_item.subset_name, SUBSET_NAME_ROLE)
+            model_item.setData(subset_item.family, SUBSET_FAMILY_ROLE)
             model_item.setData(subset_item.asset_id, ASSET_ID_ROLE)
+            model_item.setData(subset_item.asset_name, ASSET_NAME_ROLE)
 
             self._subset_items_by_id[subset_id] = subset_item
             self._items_by_id[subset_id] = model_item
@@ -455,13 +485,32 @@ class SubsetsModel(QtGui.QStandardItemModel):
         if role == QtCore.Qt.EditRole:
             return None
 
+        index = self.index(index.row(), 0, index.parent())
         if role == QtCore.Qt.DisplayRole:
-            if col == 1:
+            if not index.data(SUBSET_ID_ROLE):
+                pass
+            elif col == 1:
                 role = ASSET_NAME_ROLE
             elif col == 2:
                 role = SUBSET_FAMILY_ROLE
             elif col == self.version_col:
                 role = VERSION_NAME_ROLE
+            elif col == 4:
+                role = VERSION_PUBLISH_TIME_ROLE
+            elif col == 5:
+                role = VERSION_AUTHOR_ROLE
+            elif col == 6:
+                role = VERSION_FRAME_RANGE_ROLE
+            elif col == 7:
+                role = VERSION_DURATION_ROLE
+            elif col == 8:
+                role = VERSION_HANDLES_ROLE
+            elif col == 9:
+                role = VERSION_STEP_ROLE
+            elif col == 10:
+                role = VERSION_IN_SCENE_ROLE
+            elif col == 11:
+                role = VERSION_AVAILABLE_ROLE
             else:
                 return None
 
@@ -474,16 +523,19 @@ class SubsetsModel(QtGui.QStandardItemModel):
             return False
 
         col = index.column()
-        if (
-            role == VERSION_NAME_EDIT_ROLE
-            or (col == self.version_col and role == QtCore.Qt.EditRole)
-        ):
-            index = self.index(index.row(), 0, index.parent())
+        if (col == self.version_col and role == QtCore.Qt.EditRole):
+            role = VERSION_NAME_EDIT_ROLE
+
+        if role == VERSION_NAME_EDIT_ROLE:
+            if col != 0:
+                index = self.index(index.row(), 0, index.parent())
             subset_id = index.data(SUBSET_ID_ROLE)
             subset_item = self._subset_items_by_id[subset_id]
             version_item = subset_item.get_version_by_id(value)
             if version_item is None:
                 return False
+            if index.data(VERSION_ID_ROLE) == version_item.version_id:
+                return True
             item = self.itemFromIndex(index)
             self._set_version_data_to_subset_item(item, version_item)
             return True

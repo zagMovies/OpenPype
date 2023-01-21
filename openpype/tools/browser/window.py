@@ -1,6 +1,7 @@
 from qtpy import QtWidgets, QtCore
 
 from openpype.style import load_stylesheet
+from openpype.tools.utils.delegates import PrettyTimeDelegate
 
 from .control import BrowserController
 from .models import (
@@ -63,6 +64,10 @@ class BrowserWindow(QtWidgets.QWidget):
         version_delegate = VersionDelegate()
         subsets_view.setItemDelegateForColumn(
             subsets_model.version_col, version_delegate)
+
+        time_delegate = PrettyTimeDelegate()
+        subsets_view.setItemDelegateForColumn(
+            subsets_model.published_time_col, time_delegate)
 
         subsets_layout = QtWidgets.QVBoxLayout(subsets_widget)
         subsets_layout.setContentsMargins(0, 0, 0, 0)

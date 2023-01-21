@@ -1,3 +1,4 @@
+import copy
 import logging
 import collections
 from abc import ABCMeta, abstractmethod, abstractproperty
@@ -82,12 +83,26 @@ class VersionItem:
         version_id,
         subset_id,
         version,
-        is_hero
+        is_hero,
+        published_time,
+        author,
+        frame_range,
+        duration,
+        handles,
+        step,
+        in_scene
     ):
         self.version_id = version_id
         self.subset_id = subset_id
         self.version = version
         self.is_hero = is_hero
+        self.published_time = published_time
+        self.author = author
+        self.frame_range = frame_range
+        self.duration = duration
+        self.handles = handles
+        self.step = step
+        self.in_scene = in_scene
 
     def __eq__(self, other):
         if not isinstance(other, VersionItem):
@@ -114,12 +129,42 @@ class VersionItem:
 
     @classmethod
     def from_doc(cls, versions_doc):
+        # Get the data from the version
+        version_data = versions_doc["data"]
         is_hero = versions_doc["type"] == "hero_version"
+
+        frame_range = None
+        duration = None
+        handles = None
+
+        frame_start = version_data.get("frameStart")
+        frame_end = version_data.get("frameEnd")
+        handle_start = version_data.get("handleStart")
+        handle_end = version_data.get("handleEnd")
+
+        if frame_start is not None and frame_end is not None:
+            # Remove superfluous zeros from numbers (3.0 -> 3) to improve
+            # readability for most frame ranges
+            frame_start = int(frame_start)
+            frame_end = int(frame_end)
+            frame_range = "{0}-{1}".format(frame_start, frame_end)
+            duration = frame_end - frame_start + 1
+
+        if handle_start is not None and handle_end is not None:
+            handles = "{}-{}".format(int(handle_start), int(handle_end))
+
         return cls(
             str(versions_doc["_id"]),
             str(versions_doc["parent"]),
             versions_doc["name"],
-            is_hero
+            is_hero,
+            version_data.get("time"),
+            version_data.get("author"),
+            frame_range,
+            duration,
+            handles,
+            version_data.get("step"),
+            None
         )
 
 
@@ -128,6 +173,8 @@ class SubsetItem:
         self,
         subset_id,
         asset_id,
+        asset_name,
+        family,
         subset_name,
         group_name,
         versions
@@ -135,6 +182,8 @@ class SubsetItem:
         versions.sort()
         self.subset_id = subset_id
         self.asset_id = asset_id
+        self.asset_name = asset_name
+        self.family = family
         self.subset_name = subset_name
         self.group_name = group_name
         self.versions = versions
@@ -148,19 +197,39 @@ class SubsetItem:
             }
         return self._versions_by_id.get(version_id)
 
+    @staticmethod
+    def extract_family(data):
+        if not data:
+            return None
+        family = data.get("family")
+        if family:
+            return family
+        families = data.get("families")
+        if families:
+            return families[0]
+        return None
+
     @classmethod
-    def from_docs(cls, subset_doc, versions_docs):
+    def from_docs(cls, subset_doc, version_docs, asset_name):
+        family = cls.extract_family(subset_doc["data"])
+
         hero_version = None
         versions_by_id = {}
-        for versions_doc in versions_docs:
+        for versions_doc in version_docs:
             versions_by_id[versions_doc["_id"]] = versions_doc
             if versions_doc["type"] == "hero_version":
                 hero_version = versions_doc
+            elif not family:
+                family = cls.extract_family(versions_doc["data"])
 
         if hero_version:
             match_version = versions_by_id.get(hero_version["version_id"])
             if match_version:
                 hero_version["name"] = match_version["name"]
+                if "data" not in hero_version:
+                    hero_version["data"] = copy.deepcopy(
+                        match_version["data"]
+                    )
             else:
                 versions_by_id.pop(hero_version["_id"])
         versions = [
@@ -170,6 +239,8 @@ class SubsetItem:
         return cls(
             str(subset_doc["_id"]),
             str(subset_doc["parent"]),
+            asset_name,
+            family,
             subset_doc["name"],
             subset_doc["data"].get("group"),
             versions
@@ -254,6 +325,10 @@ class EntityModel:
         if project_name not in self._subset_items_by_project:
             self._subset_items_by_project[project_name] = {}
 
+        hierarchy_items_by_id = (
+            self._hierarchy_items_by_project.get(project_name, {})
+        )
+
         asset_ids_cache = self._subset_items_by_project[project_name]
         asset_ids_to_query = set()
         for asset_id in asset_ids:
@@ -275,7 +350,7 @@ class EntityModel:
             version_docs = list(get_versions(
                 project_name,
                 subset_ids=subset_ids,
-                fields=["_id", "type", "parent", "name", "version_id"]
+                fields=["_id", "type", "parent", "name", "version_id", "data"]
             ))
         versions_by_subset_id = collections.defaultdict(list)
         for version_doc in version_docs:
@@ -284,7 +359,11 @@ class EntityModel:
         for subset_doc in subset_docs:
             asset_id = str(subset_doc["parent"])
             version_docs = versions_by_subset_id[subset_doc["_id"]]
-            item = SubsetItem.from_docs(subset_doc, version_docs)
+            asset_item = hierarchy_items_by_id.get(asset_id)
+            asset_name = None
+            if asset_item:
+                asset_name = asset_item.name
+            item = SubsetItem.from_docs(subset_doc, version_docs, asset_name)
             asset_ids_cache[asset_id][item.subset_id] = item
 
     def refresh_subsets(self, project_name, asset_ids):
