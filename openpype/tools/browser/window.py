@@ -32,6 +32,10 @@ class BrowserWindow(QtWidgets.QWidget):
         assets_filter_input.setPlaceholderText("Name filter...")
 
         assets_view = QtWidgets.QTreeView(context_widget)
+        assets_view.setSelectionMode(
+            QtWidgets.QAbstractItemView.ExtendedSelection
+        )
+        assets_view.setHeaderHidden(True)
         assets_model = HierarchyModel(controller)
         assets_view.setModel(assets_model)
 
@@ -117,10 +121,10 @@ class BrowserWindow(QtWidgets.QWidget):
         project_name = self._projects_combobox.itemData(idx, PROJECT_NAME_ROLE)
         self._controller.set_selected_project(project_name)
 
-    def _on_asset_selection_change(self, selection, _):
-        asset_ids = set()
-        for idx in selection.indexes():
-            asset_id = idx.data(ASSET_ID_ROLE)
-            if asset_id:
-                asset_ids.add(asset_id)
+    def _on_asset_selection_change(self):
+        selection_model = self._assets_view.selectionModel()
+        asset_ids = {
+            index.data(ASSET_ID_ROLE)
+            for index in selection_model.selectedRows()
+        }
         self._controller.set_selected_asset_ids(asset_ids)
