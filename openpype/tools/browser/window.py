@@ -6,6 +6,7 @@ from .control import BrowserController
 from .models import (
     ProjectsModel,
     HierarchyModel,
+    SubsetsModel,
     PROJECT_NAME_ROLE,
     ASSET_ID_ROLE,
 )
@@ -52,6 +53,11 @@ class BrowserWindow(QtWidgets.QWidget):
         subsets_filter_input.setPlaceholderText("Subset name filter...")
 
         subsets_view = QtWidgets.QTreeView(subsets_widget)
+        subsets_view.setSelectionMode(
+            QtWidgets.QAbstractItemView.ExtendedSelection
+        )
+        subsets_model = SubsetsModel(controller)
+        subsets_view.setModel(subsets_model)
 
         subsets_layout = QtWidgets.QVBoxLayout(subsets_widget)
         subsets_layout.setContentsMargins(0, 0, 0, 0)
@@ -84,6 +90,7 @@ class BrowserWindow(QtWidgets.QWidget):
 
         self._subsets_filter_input = subsets_filter_input
         self._subsets_view = subsets_view
+        self._subsets_model = subsets_model
 
         self._controller = controller
         self._first_show = True
