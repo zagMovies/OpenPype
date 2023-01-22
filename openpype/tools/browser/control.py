@@ -1,6 +1,7 @@
 import copy
 import logging
 import collections
+import time
 from abc import ABCMeta, abstractmethod, abstractproperty
 import six
 
@@ -40,6 +41,42 @@ class AbstractController:
     @abstractmethod
     def set_selected_project(self, project_name):
         pass
+
+
+class CacheItem:
+    lifetime = 20
+
+    def __init__(self, data, lifetime=None):
+        self._data = data
+        if lifetime is not None:
+            self.lifetime = lifetime
+
+        self._outdate_time = time.time() + self.lifetime
+
+    @property
+    def is_outdated(self):
+        if not self.lifetime:
+            return False
+        return time.time() > self._outdate_time
+
+    def set_lifetime(self, lifetime):
+        self.lifetime = lifetime
+
+    def set_outdated(self):
+        self._outdate_time = 0
+
+    def update_data(self, data):
+        self._data = data
+        self._outdate_time = time.time() + self.lifetime
+
+    def get_data(self):
+        return self._data
+
+    @classmethod
+    def create_outdated(cls):
+        obj = cls(None)
+        obj.set_outdated()
+        return obj
 
 
 class HierarchyItem:
@@ -251,13 +288,20 @@ class EntityModel:
     def __init__(self, controller):
         self._controller = controller
         self._projects = None
-        self._hierarchy_items_by_project = {None: {}}
+        self._hierarchy_items_by_project = collections.defaultdict(
+            CacheItem.create_outdated
+        )
+        self._hierarchy_items_by_project[None].set_lifetime(0)
+
         self._subset_items_by_project = {None: {}}
         self._repre_items_by_project = {None: {}}
 
     def clear_cache(self):
         self._projects = None
-        self._hierarchy_items_by_project = {None: {}}
+        self._hierarchy_items_by_project = collections.defaultdict(
+            CacheItem.create_outdated
+        )
+        self._hierarchy_items_by_project[None].set_lifetime(0)
         self._subset_items_by_project = {None: {}}
         self._repre_items_by_project = {None: {}}
 
@@ -270,17 +314,37 @@ class EntityModel:
         return set(self._projects)
 
     def get_hierarchy_items(self, project_name):
-        if project_name not in self._hierarchy_items_by_project:
+        data = self._hierarchy_items_by_project[project_name].get_data()
+        if data is None:
             return None
-        return dict(self._hierarchy_items_by_project[project_name])
+        return dict(data)
 
     def get_subset_items(self, project_name, asset_ids):
-        asset_ids_cache = self._subset_items_by_project.get(project_name, {})
+        if not asset_ids:
+            return {}
+
+        asset_ids_cache = self._subset_items_by_project.get(project_name)
+        if not asset_ids_cache:
+            return {}
         output = {}
         for asset_id in asset_ids:
-            subset_items = asset_ids_cache.get(asset_id)
-            if subset_items:
-                output.update(subset_items)
+            data = asset_ids_cache[asset_id].get_data()
+            if data:
+                output.update(data)
+        return output
+
+    def get_repre_items(self, project_name, version_ids):
+        output = {}
+        if not version_ids:
+            return output
+        repre_ids_cache = self._repre_items_by_project.get(project_name)
+        if repre_ids_cache is None:
+            return output
+
+        for version_id in version_ids:
+            data = repre_ids_cache[version_id].get_data()
+            if data:
+                output.update(data)
         return output
 
     def refresh_projects(self):
@@ -295,9 +359,12 @@ class EntityModel:
     def _refresh_hierarchy(self, project_name):
         if not project_name:
             return
-        hierarchy_items_by_id = {}
-        self._hierarchy_items_by_project[project_name] = hierarchy_items_by_id
 
+        cache = self._hierarchy_items_by_project[project_name]
+        if not cache.is_outdated:
+            return
+
+        hierarchy_items_by_id = {}
         asset_docs_by_parent_id = collections.defaultdict(list)
         for asset_doc in get_assets(project_name):
             parent_id = asset_doc["data"].get("visualParent")
@@ -316,6 +383,8 @@ class EntityModel:
             for child in children:
                 hierarchy_queue.append(child)
 
+        cache.update_data(hierarchy_items_by_id)
+
     def refresh_hierarchy(self, project_name):
         self._emit_event("model.hierarchy.refresh.started")
         self._refresh_hierarchy(project_name)
@@ -323,18 +392,20 @@ class EntityModel:
 
     def _refresh_subsets(self, project_name, asset_ids):
         if project_name not in self._subset_items_by_project:
-            self._subset_items_by_project[project_name] = {}
+            self._subset_items_by_project[project_name] = (
+                collections.defaultdict(CacheItem.create_outdated)
+            )
 
         hierarchy_items_by_id = (
-            self._hierarchy_items_by_project.get(project_name, {})
+            self._hierarchy_items_by_project[project_name].get_data()
         )
 
         asset_ids_cache = self._subset_items_by_project[project_name]
-        asset_ids_to_query = set()
-        for asset_id in asset_ids:
-            if asset_id not in asset_ids_cache:
-                asset_ids_to_query.add(asset_id)
-                asset_ids_cache[asset_id] = {}
+        asset_ids_to_query = {
+            asset_id
+            for asset_id in asset_ids
+            if asset_ids_cache[asset_id].is_outdated
+        }
 
         subset_docs = []
         version_docs = []
@@ -356,15 +427,27 @@ class EntityModel:
         for version_doc in version_docs:
             versions_by_subset_id[version_doc["parent"]].append(version_doc)
 
+        subset_docs_by_asset_id = {
+            asset_id: []
+            for asset_id in asset_ids_to_query
+        }
         for subset_doc in subset_docs:
             asset_id = str(subset_doc["parent"])
-            version_docs = versions_by_subset_id[subset_doc["_id"]]
+            subset_docs_by_asset_id[asset_id].append(subset_doc)
+
+        for asset_id, subset_docs in subset_docs_by_asset_id.items():
             asset_item = hierarchy_items_by_id.get(asset_id)
             asset_name = None
             if asset_item:
                 asset_name = asset_item.name
-            item = SubsetItem.from_docs(subset_doc, version_docs, asset_name)
-            asset_ids_cache[asset_id][item.subset_id] = item
+
+            asset_value = {}
+            for subset_doc in subset_docs:
+                version_docs = versions_by_subset_id[subset_doc["_id"]]
+                item = SubsetItem.from_docs(
+                    subset_doc, version_docs, asset_name)
+                asset_value[item.subset_id] = item
+            asset_ids_cache[asset_id].update_data(asset_value)
 
     def refresh_subsets(self, project_name, asset_ids):
         self._emit_event("model.subsets.refresh.started")
