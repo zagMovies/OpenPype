@@ -9,7 +9,8 @@ from openpype.client import (
     get_projects,
     get_assets,
     get_subsets,
-    get_versions
+    get_versions,
+    get_representations
 )
 from openpype.lib.events import EventSystem
 
@@ -284,6 +285,19 @@ class SubsetItem:
         )
 
 
+class RepreItem:
+    def __init__(self, repre_id, version_id):
+        self.repre_id = repre_id
+        self.version_id = version_id
+
+    @classmethod
+    def from_doc(cls, repre_doc):
+        return cls(
+            str(repre_doc["_id"]),
+            str(repre_doc["parent"]),
+        )
+
+
 class EntityModel:
     def __init__(self, controller):
         self._controller = controller
@@ -452,10 +466,43 @@ class EntityModel:
     def refresh_subsets(self, project_name, asset_ids):
         self._emit_event("model.subsets.refresh.started")
         self._refresh_subsets(project_name, asset_ids)
+        # Add information about which project and asset ids did refresh
         self._emit_event("model.subsets.refresh.finished")
 
-    def refresh_representations(self, project_name, asset_ids, version_ids):
+    def _refresh_representations(self, project_name, version_ids):
+        if project_name not in self._repre_items_by_project:
+            self._repre_items_by_project[project_name] = (
+                collections.defaultdict(CacheItem.create_outdated)
+            )
+
+        version_ids_to_query = set()
+        repre_cache = self._repre_items_by_project[project_name]
+        for version_id in version_ids:
+            if repre_cache[version_id].is_outdated:
+                version_ids_to_query.add(version_id)
+
+        if not version_ids_to_query:
+            return
+
+        repre_docs_by_version_id = {
+            version_id: {}
+            for version_id in version_ids_to_query
+        }
+        repre_docs = get_representations(
+            project_name, version_ids=version_ids_to_query
+        )
+        for repre_doc in repre_docs:
+            repre_item = RepreItem.from_doc(repre_doc)
+            repre_docs_by_version_id[repre_item.version_id][repre_item.id] = {
+                repre_item
+            }
+
+        for version_id, repre_items in repre_docs_by_version_id.items():
+            repre_cache[version_id].update_data(repre_items)
+
+    def refresh_representations(self, project_name, version_ids):
         self._emit_event("model.representations.refresh.started")
+        self._refresh_representations(project_name, version_ids)
         self._emit_event("model.representations.refresh.finished")
 
 
