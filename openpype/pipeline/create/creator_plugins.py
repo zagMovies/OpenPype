@@ -12,6 +12,7 @@ import six
 
 from openpype.settings import get_system_settings, get_project_settings
 from openpype.lib import Logger
+from openpype.pipeline import get_custom_staging_dir_info
 from openpype.pipeline.plugin_discover import (
     discover,
     register_plugin,
@@ -19,8 +20,11 @@ from openpype.pipeline.plugin_discover import (
     deregister_plugin,
     deregister_plugin_path
 )
-
+from openpype.client import (
+    get_asset_by_name
+)
 from .subset_name import get_subset_name
+from ..template_data import get_task_type
 from .legacy_create import LegacyCreator
 
 
@@ -610,6 +614,52 @@ class Creator(BaseCreator):
                 for created instance.
         """
         return self.pre_create_attr_defs
+
+    def get_custom_staging_dir_data(self, instance, task_type=None):
+        """Custom staging directory data.
+
+        Arguments:
+            instance (CreatedInstance): Instance for which we want to get
+                staging dir.
+            task_type (str): Task type. If not set it will be queried from
+        Returns:
+            Dict[str, Any]: Custom staging directory data.
+        """
+        task_name = instance["task"]
+        task_type = task_type or self.get_task_type(task_name)
+
+        custom_staging_dir, is_persistent = get_custom_staging_dir_info(
+            self.project_name,
+            self.host_name,
+            self.family,
+            task_name,
+            task_type,
+            instance["subset"],
+            project_settings=self.project_settings,
+            anatomy=self.project_anatomy, log=self.log
+        )
+        return {
+            "stagingDir": custom_staging_dir,
+            "stagingDir_persistent": is_persistent
+        }
+
+    def get_task_type(self, task_name):
+        """Get task type from task name.
+
+        Args:
+            task_name (str): Task name.
+
+        Returns:
+            str: Task type.
+        """
+        create_context = self.create_context
+        project_name = create_context.get_current_project_name()
+        asset_name = create_context.get_current_asset_name()
+        task_name = create_context.get_current_task_name()
+
+        asset_doc = get_asset_by_name(project_name, asset_name)
+
+        return get_task_type(asset_doc, task_name)
 
 
 class HiddenCreator(BaseCreator):
