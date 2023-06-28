@@ -623,12 +623,14 @@ class Creator(BaseCreator):
                 staging dir.
             task_type (str): Task type. If not set it will be queried from
         Returns:
-            Dict[str, Any]: Custom staging directory data.
+            Tuple[Any, Any]: Tuple of staging dir and is_persistent or None
+        Raises:
+            ValueError - if misconfigured template should be used
         """
         task_name = instance["task"]
         task_type = task_type or self.get_task_type(task_name)
 
-        custom_staging_dir, is_persistent = get_custom_staging_dir_info(
+        return get_custom_staging_dir_info(
             self.project_name,
             self.host_name,
             self.family,
@@ -638,10 +640,6 @@ class Creator(BaseCreator):
             project_settings=self.project_settings,
             anatomy=self.project_anatomy, log=self.log
         )
-        return {
-            "stagingDir": custom_staging_dir,
-            "stagingDir_persistent": is_persistent
-        }
 
     def get_task_type(self, task_name):
         """Get task type from task name.

@@ -34,7 +34,7 @@ def get_custom_staging_dir_info(project_name, host_name, family, task_name,
         log (Logger) (optional)
 
     Returns:
-        (tuple)
+        Tuple[Any, Any]: Tuple of staging dir and is_persistent or None
     Raises:
         ValueError - if misconfigured template should be used
     """
