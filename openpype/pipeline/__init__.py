@@ -94,6 +94,12 @@ from .context_tools import (
     get_current_asset_name,
     get_current_task_name,
 )
+
+from .stagingdir import (
+    get_custom_staging_dir_info,
+    get_instance_staging_dir
+)
+
 install = install_host
 uninstall = uninstall_host
 
@@ -195,4 +201,8 @@ __all__ = (
     # Backwards compatible function names
     "install",
     "uninstall",
+
+    # --- Staging dir ---
+    "get_custom_staging_dir_info",
+    "get_instance_staging_dir"
 )
