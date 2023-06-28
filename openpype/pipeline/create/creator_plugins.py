@@ -626,12 +626,12 @@ class Creator(BaseCreator):
         Raises:
             ValueError - if misconfigured template should be used
         """
-        from openpype.pipeline import get_custom_staging_dir_info
+        from openpype.pipeline import get_transient_data_profile_info
 
         task_name = instance["task"]
         task_type = task_type or self.get_task_type(task_name)
 
-        return get_custom_staging_dir_info(
+        return get_transient_data_profile_info(
             self.project_name,
             self.host_name,
             self.family,

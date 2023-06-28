@@ -16,10 +16,12 @@ from openpype.settings import (
 TRANSIENT_DIR_TEMPLATE = "transient"
 
 
-def get_custom_staging_dir_info(project_name, host_name, family, task_name,
-                                task_type, subset_name,
-                                project_settings=None,
-                                anatomy=None, log=None):
+def get_transient_data_profile_info(
+        project_name, host_name, family, task_name,
+        task_type, subset_name,
+        project_settings=None,
+        anatomy=None, log=None
+):
     """Checks profiles if context should use special custom dir as staging.
 
     Args:
@@ -47,7 +49,7 @@ def get_custom_staging_dir_info(project_name, host_name, family, task_name,
         return None, None
 
     if not log:
-        log = Logger.get_logger("get_custom_staging_dir_info")
+        log = Logger.get_logger("get_transient_data_profile_info")
 
     filtering_criteria = {
         "hosts": host_name,

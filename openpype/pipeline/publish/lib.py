@@ -677,6 +677,18 @@ def context_plugin_should_run(plugin, context):
     return False
 
 
+# deprecated: backward compatibility only
+def get_custom_staging_dir_info(*args, **kwargs):
+    from .. import get_transient_data_profile_info
+    return get_transient_data_profile_info(*args, **kwargs)
+
+
+# deprecated: backward compatibility only
+def get_instance_staging_dir(instance):
+    from .. import get_instance_staging_dir
+    return get_instance_staging_dir(instance)
+
+
 def get_publish_repre_path(instance, repre, only_published=False):
     """Get representation path that can be used for integration.
 

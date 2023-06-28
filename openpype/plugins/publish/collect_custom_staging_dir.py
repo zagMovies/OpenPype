@@ -12,7 +12,7 @@ import os.path
 
 import pyblish.api
 
-from openpype.pipeline import get_custom_staging_dir_info
+from openpype.pipeline import get_transient_data_profile_info
 
 
 class CollectCustomStagingDir(pyblish.api.InstancePlugin):
@@ -46,7 +46,7 @@ class CollectCustomStagingDir(pyblish.api.InstancePlugin):
         anatomy = instance.context.data["anatomy"]
         task = instance.data["anatomyData"].get("task", {})
 
-        transient_tml, is_persistent = get_custom_staging_dir_info(
+        transient_tml, is_persistent = get_transient_data_profile_info(
             project_name, host_name, family, task.get("name"),
             task.get("type"), subset_name, project_settings=project_settings,
             anatomy=anatomy, log=self.log)
