@@ -12,7 +12,6 @@ import six
 
 from openpype.settings import get_system_settings, get_project_settings
 from openpype.lib import Logger
-from openpype.pipeline import get_custom_staging_dir_info
 from openpype.pipeline.plugin_discover import (
     discover,
     register_plugin,
@@ -627,6 +626,8 @@ class Creator(BaseCreator):
         Raises:
             ValueError - if misconfigured template should be used
         """
+        from openpype.pipeline import get_custom_staging_dir_info
+
         task_name = instance["task"]
         task_type = task_type or self.get_task_type(task_name)
 

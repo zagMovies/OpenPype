@@ -11,7 +11,6 @@ from .lib import (
     get_errored_instances_from_context,
     get_errored_plugins_from_context
 )
-from .. import get_instance_staging_dir
 from openpype.pipeline.colorspace import (
     get_imageio_colorspace_from_filepath,
     get_imageio_config,
@@ -283,6 +282,7 @@ class Extractor(pyblish.api.InstancePlugin):
         Upon calling this method the staging directory is stored inside
         the instance.data['stagingDir']
         """
+        from .. import get_instance_staging_dir
 
         return get_instance_staging_dir(instance)
 

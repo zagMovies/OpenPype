@@ -24,8 +24,6 @@ from .contants import (
     DEFAULT_PUBLISH_TEMPLATE,
     DEFAULT_HERO_PUBLISH_TEMPLATE
 )
-from .. import get_instance_staging_dir
-
 
 def get_template_name_profiles(
     project_name, project_settings=None, logger=None
@@ -700,6 +698,7 @@ def get_publish_repre_path(instance, repre, only_published=False):
         str: Path to representation file.
         None: Path is not filled or does not exists.
     """
+    from .. import get_instance_staging_dir
 
     published_path = repre.get("published_path")
     if published_path:
