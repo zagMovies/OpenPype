@@ -62,6 +62,15 @@ class CreateSource(NukeCreator):
                     self
                 )
 
+                (
+                    staging_dir_data, is_persistent
+                ) = self.get_custom_staging_dir_data(instance)
+
+                if is_persistent:
+                    instance["stagingDirIsPersistent"] = is_persistent
+                if staging_dir_data:
+                    instance["stagingDir"] = staging_dir_data
+
                 instance.transient_data["node"] = instance_node
 
                 self._add_instance_to_context(instance)
