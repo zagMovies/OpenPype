@@ -12,7 +12,7 @@ import os.path
 
 import pyblish.api
 
-from openpype.pipeline.publish.lib import get_custom_staging_dir_info
+from openpype.pipeline import get_custom_staging_dir_info
 
 
 class CollectCustomStagingDir(pyblish.api.InstancePlugin):
