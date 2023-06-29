@@ -614,24 +614,24 @@ class Creator(BaseCreator):
         """
         return self.pre_create_attr_defs
 
-    def get_custom_staging_dir_data(self, instance, task_type=None):
-        """Custom staging directory data.
+    def get_transient_data_profile(self, instance, task_type=None):
+        """Transient data directory profile.
 
         Arguments:
             instance (CreatedInstance): Instance for which we want to get
                 staging dir.
             task_type (str): Task type. If not set it will be queried from
         Returns:
-            Tuple[Any, Any]: Tuple of staging dir and is_persistent or None
+            Dict or None: Data with template and persistance flag or None
         Raises:
             ValueError - if misconfigured template should be used
         """
-        from openpype.pipeline import get_transient_data_profile_info
+        from openpype.pipeline import get_transient_data_profile
 
         task_name = instance["task"]
         task_type = task_type or self.get_task_type(task_name)
 
-        return get_transient_data_profile_info(
+        return get_transient_data_profile(
             self.project_name,
             self.host_name,
             self.family,

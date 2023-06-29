@@ -96,7 +96,7 @@ from .context_tools import (
 )
 
 from .stagingdir import (
-    get_transient_data_profile_info,
+    get_transient_data_profile,
     get_instance_staging_dir
 )
 
@@ -203,6 +203,6 @@ __all__ = (
     "uninstall",
 
     # --- Staging dir ---
-    "get_transient_data_profile_info",
+    "get_transient_data_profile",
     "get_instance_staging_dir"
 )

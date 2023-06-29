@@ -678,12 +678,19 @@ def context_plugin_should_run(plugin, context):
 
 
 # deprecated: backward compatibility only
+# TODO: remove in the future
 def get_custom_staging_dir_info(*args, **kwargs):
-    from .. import get_transient_data_profile_info
-    return get_transient_data_profile_info(*args, **kwargs)
+    from .. import get_transient_data_profile
+    tr_data = get_transient_data_profile(*args, **kwargs)
+
+    if not tr_data:
+        return None, None
+
+    return tr_data["transient_template"], tr_data["transient_persistence"]
 
 
 # deprecated: backward compatibility only
+# TODO: remove in the future
 def get_instance_staging_dir(instance):
     from .. import get_instance_staging_dir
     return get_instance_staging_dir(instance)

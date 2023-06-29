@@ -139,7 +139,7 @@
                                 "type": "separator"
                             },
                             {
-                                "key": "custom_staging_dir_persistent",
+                                "key": "data_persistence",
                                 "label": "Folder is persistent",
                                 "type": "boolean",
                                 "default": false
