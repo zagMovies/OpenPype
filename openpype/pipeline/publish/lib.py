@@ -18,6 +18,11 @@ from openpype.settings import (
     get_project_settings,
     get_system_settings,
 )
+from openpype.pipeline import (
+    get_transient_data_profile,
+    get_instance_staging_dir
+)
+
 from openpype.pipeline.plugin_discover import DiscoverResult
 
 from .contants import (
@@ -680,7 +685,6 @@ def context_plugin_should_run(plugin, context):
 # deprecated: backward compatibility only
 # TODO: remove in the future
 def get_custom_staging_dir_info(*args, **kwargs):
-    from .. import get_transient_data_profile
     tr_data = get_transient_data_profile(*args, **kwargs)
 
     if not tr_data:
@@ -692,7 +696,6 @@ def get_custom_staging_dir_info(*args, **kwargs):
 # deprecated: backward compatibility only
 # TODO: remove in the future
 def get_instance_staging_dir(instance):
-    from .. import get_instance_staging_dir
     return get_instance_staging_dir(instance)
 
 

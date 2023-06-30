@@ -4,10 +4,7 @@ from openpype.lib import (
     Logger,
     filter_profiles
 )
-from openpype.pipeline import (
-    tempdir,
-    Anatomy
-)
+from openpype import pipeline
 from openpype.settings import (
     get_project_settings
 )
@@ -22,7 +19,7 @@ def get_transient_data_profile(
         project_settings=None,
         anatomy=None, log=None
 ):
-    """Checks profiles if context should use special custom dir as staging.
+    """Checks profiles if context should use transient dir as staging dir.
 
     Args:
         project_name (str)
@@ -68,15 +65,14 @@ def get_transient_data_profile(
         "task_types": task_type,
         "subsets": subset_name
     }
-    profile = filter_profiles(transient_data_profiles,
-                              filtering_criteria,
-                              logger=log)
+    profile = filter_profiles(
+        transient_data_profiles, filtering_criteria, logger=log)
 
     if not profile or not profile["active"]:
         return
 
     if not anatomy:
-        anatomy = Anatomy(project_name)
+        anatomy = pipeline.Anatomy(project_name)
 
     template_name = profile["template_name"] or TRANSIENT_DIR_TEMPLATE
     _validate_transient_template(project_name, template_name, anatomy)
@@ -147,7 +143,7 @@ def get_instance_staging_dir(instance):
     anatomy = instance.context.data.get("anatomy")
 
     # get customized tempdir path from `OPENPYPE_TMPDIR` env var
-    custom_temp_dir = tempdir.create_custom_tempdir(
+    custom_temp_dir = pipeline.create_custom_tempdir(
         anatomy.project_name, anatomy)
 
     if custom_temp_dir:

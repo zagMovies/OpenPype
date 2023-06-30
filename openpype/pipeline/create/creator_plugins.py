@@ -642,7 +642,7 @@ class Creator(BaseCreator):
             anatomy=self.project_anatomy, log=self.log
         )
 
-    def get_task_type(self, task_name):
+    def get_task_type(self, task_name=None):
         """Get task type from task name.
 
         Args:
@@ -651,6 +651,9 @@ class Creator(BaseCreator):
         Returns:
             str: Task type.
         """
+        if not task_name:
+            return None
+
         create_context = self.create_context
         project_name = create_context.get_current_project_name()
         asset_name = create_context.get_current_asset_name()

@@ -9,6 +9,13 @@ from .mongodb import (
 )
 from .anatomy import Anatomy
 
+from .tempdir import create_custom_tempdir
+
+from .stagingdir import (
+    get_transient_data_profile,
+    get_instance_staging_dir
+)
+
 from .create import (
     BaseCreator,
     Creator,
@@ -95,10 +102,6 @@ from .context_tools import (
     get_current_task_name,
 )
 
-from .stagingdir import (
-    get_transient_data_profile,
-    get_instance_staging_dir
-)
 
 install = install_host
 uninstall = uninstall_host
@@ -114,6 +117,13 @@ __all__ = (
 
     # --- Anatomy ---
     "Anatomy",
+
+    # --- Temp dir ---
+    "create_custom_tempdir",
+
+    # --- Staging dir ---
+    "get_transient_data_profile",
+    "get_instance_staging_dir",
 
     # --- Create ---
     "BaseCreator",
@@ -200,9 +210,5 @@ __all__ = (
 
     # Backwards compatible function names
     "install",
-    "uninstall",
-
-    # --- Staging dir ---
-    "get_transient_data_profile",
-    "get_instance_staging_dir"
+    "uninstall"
 )
