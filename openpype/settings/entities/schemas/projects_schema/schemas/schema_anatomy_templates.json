@@ -144,6 +144,12 @@
             "object_type": "text"
         },
         {
+            "type": "dict-modifiable",
+            "key": "staging_dir",
+            "label": "Staging Dir",
+            "object_type": "text"
+        },
+        {
             "type": "dict",
             "key": "unreal",
             "label": "Unreal",

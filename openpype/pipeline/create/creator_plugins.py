@@ -19,6 +19,9 @@ from openpype.pipeline.plugin_discover import (
     deregister_plugin,
     deregister_plugin_path
 )
+from openpype.pipeline import (
+    get_staging_dir_profile as _get_staging_dir_profile
+)
 from openpype.client import (
     get_asset_by_name
 )
@@ -615,8 +618,8 @@ class Creator(BaseCreator):
         """
         return self.pre_create_attr_defs
 
-    def get_transient_data_profile(self, instance, task_type=None):
-        """Transient data directory profile.
+    def get_staging_dir_profile(self, instance, task_type=None):
+        """Get staging directory profile.
 
         Arguments:
             instance (CreatedInstance): Instance for which we want to get
@@ -627,13 +630,12 @@ class Creator(BaseCreator):
         Raises:
             ValueError - if misconfigured template should be used
         """
-        from openpype.pipeline import get_transient_data_profile
 
         # task can be optional in tray publisher
         task_name = instance.get("task")
         task_type = task_type or self.get_task_type(task_name)
 
-        return get_transient_data_profile(
+        return _get_staging_dir_profile(
             self.project_name,
             self.host_name,
             self.family,

@@ -19,7 +19,7 @@ from openpype.settings import (
     get_system_settings,
 )
 from openpype.pipeline import (
-    get_transient_data_profile,
+    get_staging_dir_profile,
     get_instance_staging_dir as _get_instance_staging_dir
 )
 
@@ -685,12 +685,12 @@ def context_plugin_should_run(plugin, context):
 # deprecated: backward compatibility only
 # TODO: remove in the future
 def get_custom_staging_dir_info(*args, **kwargs):
-    tr_data = get_transient_data_profile(*args, **kwargs)
+    tr_data = get_staging_dir_profile(*args, **kwargs)
 
     if not tr_data:
         return None, None
 
-    return tr_data["transient_template"], tr_data["transient_persistence"]
+    return tr_data["template"], tr_data["persistence"]
 
 
 # deprecated: backward compatibility only

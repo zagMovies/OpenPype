@@ -12,7 +12,7 @@ from .anatomy import Anatomy
 from .tempdir import create_custom_tempdir
 
 from .stagingdir import (
-    get_transient_data_profile,
+    get_staging_dir_profile,
     get_instance_staging_dir
 )
 
@@ -122,7 +122,7 @@ __all__ = (
     "create_custom_tempdir",
 
     # --- Staging dir ---
-    "get_transient_data_profile",
+    "get_staging_dir_profile",
     "get_instance_staging_dir",
 
     # --- Create ---
