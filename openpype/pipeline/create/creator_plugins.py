@@ -629,7 +629,7 @@ class Creator(BaseCreator):
         """
         from openpype.pipeline import get_transient_data_profile
 
-        task_name = instance["task"]
+        task_name = instance.get("task")
         task_type = task_type or self.get_task_type(task_name)
 
         return get_transient_data_profile(
