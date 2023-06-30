@@ -720,7 +720,6 @@ def get_publish_repre_path(instance, repre, only_published=False):
         str: Path to representation file.
         None: Path is not filled or does not exists.
     """
-    from .. import get_instance_staging_dir
 
     published_path = repre.get("published_path")
     if published_path:
@@ -739,7 +738,7 @@ def get_publish_repre_path(instance, repre, only_published=False):
 
     staging_dir = repre.get("stagingDir")
     if not staging_dir:
-        staging_dir = get_instance_staging_dir(instance)
+        staging_dir = _get_instance_staging_dir(instance)
 
     # Expand the staging dir path in case it's been stored with the root
     # template syntax

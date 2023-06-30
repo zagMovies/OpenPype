@@ -124,6 +124,35 @@ def get_instance_staging_dir(instance):
     First check if 'stagingDir' is already set in instance data.
     In case there already is new tempdir will not be created.
 
+    Returns:
+        str: Path to staging dir
+    """
+    anatomy = instance.context.data.get("anatomy")
+    staging_dir = instance.data.get('stagingDir')
+
+    if not staging_dir:
+        staging_dir = get_staging_dir(
+            project_name=instance.context.data["projectName"],
+            anatomy=anatomy
+        )
+
+    instance.data['stagingDir'] = staging_dir
+
+    return staging_dir
+
+
+def get_staging_dir(
+        project_name=None,
+        anatomy=None,
+        prefix=None, suffix=None,
+        make_local=False
+):
+    """Get staging dir path.
+
+    If `make_local` is set, tempdir will be created in local tempdir.
+    If `anatomy` is not set, default anatomy will be used.
+    If `prefix` or `suffix` is not set, default values will be used.
+
     It also supports `OPENPYPE_TMPDIR`, so studio can define own temp
     shared repository per project or even per more granular context.
     Template formatting is supported also with optional keys. Folder is
@@ -138,33 +167,46 @@ def get_instance_staging_dir(instance):
         about its usage.
 
     Args:
-        instance (pyblish.lib.Instance): Instance for which we want to get
-            staging dir.
+        project_name (str)[optional]: Name of project.
+        anatomy (openpype.pipeline.Anatomy)[optional]: Anatomy object.
+        make_local (bool)[optional]: If True, staging dir will be created in
+            local tempdir.
+        suffix (str)[optional]: Suffix for tempdir.
+        prefix (str)[optional]: Prefix for tempdir.
 
     Returns:
         str: Path to staging dir of instance.
     """
-    staging_dir = instance.data.get('stagingDir')
-    if staging_dir:
-        return staging_dir
+    prefix = prefix or "op_tmp_"
+    suffix = suffix or ""
 
-    anatomy = instance.context.data.get("anatomy")
+    if make_local:
+        return _create_local_staging_dir(prefix, suffix)
+
+    # make sure anatomy is set
+    if not anatomy:
+        anatomy = pipeline.Anatomy(project_name)
 
     # get customized tempdir path from `OPENPYPE_TMPDIR` env var
     custom_temp_dir = pipeline.create_custom_tempdir(
         anatomy.project_name, anatomy)
 
     if custom_temp_dir:
-        staging_dir = os.path.normpath(
+        return os.path.normpath(
             tempfile.mkdtemp(
-                prefix="pyblish_tmp_",
+                prefix=prefix,
+                suffix=suffix,
                 dir=custom_temp_dir
             )
         )
     else:
-        staging_dir = os.path.normpath(
-            tempfile.mkdtemp(prefix="pyblish_tmp_")
-        )
-    instance.data['stagingDir'] = staging_dir
+        return _create_local_staging_dir(prefix, suffix)
 
-    return staging_dir
+
+def _create_local_staging_dir(prefix, suffix):
+    return os.path.normpath(
+        tempfile.mkdtemp(
+            prefix=prefix,
+            suffix=suffix
+        )
+    )

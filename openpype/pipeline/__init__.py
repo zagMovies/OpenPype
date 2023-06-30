@@ -13,7 +13,8 @@ from .tempdir import create_custom_tempdir
 
 from .stagingdir import (
     get_staging_dir_profile,
-    get_instance_staging_dir
+    get_instance_staging_dir,
+    get_staging_dir
 )
 
 from .create import (
@@ -124,6 +125,7 @@ __all__ = (
     # --- Staging dir ---
     "get_staging_dir_profile",
     "get_instance_staging_dir",
+    "get_staging_dir",
 
     # --- Create ---
     "BaseCreator",
