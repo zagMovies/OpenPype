@@ -629,6 +629,7 @@ class Creator(BaseCreator):
         """
         from openpype.pipeline import get_transient_data_profile
 
+        # task can be optional in tray publisher
         task_name = instance.get("task")
         task_type = task_type or self.get_task_type(task_name)
 
@@ -647,7 +648,7 @@ class Creator(BaseCreator):
         """Get task type from task name.
 
         Args:
-            task_name (str): Task name.
+            task_name (str)[optional]: Task name.
 
         Returns:
             str: Task type.
