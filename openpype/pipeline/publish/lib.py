@@ -18,14 +18,17 @@ from openpype.settings import (
     get_project_settings,
     get_system_settings,
 )
+from openpype.pipeline import (
+    get_transient_data_profile,
+    get_instance_staging_dir as _get_instance_staging_dir
+)
+
 from openpype.pipeline.plugin_discover import DiscoverResult
 
 from .contants import (
     DEFAULT_PUBLISH_TEMPLATE,
     DEFAULT_HERO_PUBLISH_TEMPLATE
 )
-from .. import get_instance_staging_dir
-
 
 def get_template_name_profiles(
     project_name, project_settings=None, logger=None
@@ -679,6 +682,23 @@ def context_plugin_should_run(plugin, context):
     return False
 
 
+# deprecated: backward compatibility only
+# TODO: remove in the future
+def get_custom_staging_dir_info(*args, **kwargs):
+    tr_data = get_transient_data_profile(*args, **kwargs)
+
+    if not tr_data:
+        return None, None
+
+    return tr_data["transient_template"], tr_data["transient_persistence"]
+
+
+# deprecated: backward compatibility only
+# TODO: remove in the future
+def get_instance_staging_dir(instance):
+    return _get_instance_staging_dir(instance)
+
+
 def get_publish_repre_path(instance, repre, only_published=False):
     """Get representation path that can be used for integration.
 
@@ -700,6 +720,7 @@ def get_publish_repre_path(instance, repre, only_published=False):
         str: Path to representation file.
         None: Path is not filled or does not exists.
     """
+    from .. import get_instance_staging_dir
 
     published_path = repre.get("published_path")
     if published_path:

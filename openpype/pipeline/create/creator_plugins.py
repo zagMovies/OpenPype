@@ -12,7 +12,6 @@ import six
 
 from openpype.settings import get_system_settings, get_project_settings
 from openpype.lib import Logger
-from openpype.pipeline import get_custom_staging_dir_info
 from openpype.pipeline.plugin_discover import (
     discover,
     register_plugin,
@@ -23,8 +22,9 @@ from openpype.pipeline.plugin_discover import (
 from openpype.client import (
     get_asset_by_name
 )
+from openpype.pipeline.template_data import get_task_type
+
 from .subset_name import get_subset_name
-from ..template_data import get_task_type
 from .legacy_create import LegacyCreator
 
 
@@ -615,22 +615,25 @@ class Creator(BaseCreator):
         """
         return self.pre_create_attr_defs
 
-    def get_custom_staging_dir_data(self, instance, task_type=None):
-        """Custom staging directory data.
+    def get_transient_data_profile(self, instance, task_type=None):
+        """Transient data directory profile.
 
         Arguments:
             instance (CreatedInstance): Instance for which we want to get
                 staging dir.
             task_type (str): Task type. If not set it will be queried from
         Returns:
-            Tuple[Any, Any]: Tuple of staging dir and is_persistent or None
+            Dict or None: Data with template and persistance flag or None
         Raises:
             ValueError - if misconfigured template should be used
         """
-        task_name = instance["task"]
+        from openpype.pipeline import get_transient_data_profile
+
+        # task can be optional in tray publisher
+        task_name = instance.get("task")
         task_type = task_type or self.get_task_type(task_name)
 
-        return get_custom_staging_dir_info(
+        return get_transient_data_profile(
             self.project_name,
             self.host_name,
             self.family,
@@ -641,15 +644,18 @@ class Creator(BaseCreator):
             anatomy=self.project_anatomy, log=self.log
         )
 
-    def get_task_type(self, task_name):
+    def get_task_type(self, task_name=None):
         """Get task type from task name.
 
         Args:
-            task_name (str): Task name.
+            task_name (str)[optional]: Task name.
 
         Returns:
             str: Task type.
         """
+        if not task_name:
+            return None
+
         create_context = self.create_context
         project_name = create_context.get_current_project_name()
         asset_name = create_context.get_current_asset_name()

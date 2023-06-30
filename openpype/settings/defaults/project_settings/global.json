@@ -18,6 +18,9 @@
             }
         }
     },
+    "transient_data_profiles": {
+        "profiles": []
+    },
     "publish": {
         "CollectAnatomyInstanceData": {
             "follow_workfile_version": false

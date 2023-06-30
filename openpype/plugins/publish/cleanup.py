@@ -86,15 +86,15 @@ class CleanUp(pyblish.api.InstancePlugin):
             return
 
         if not os.path.normpath(staging_dir).startswith(temp_root):
-            self.log.info("Skipping cleanup. Staging directory is not in the "
-                          "temp folder: %s" % staging_dir)
+            self.log.debug("Skipping cleanup. Staging directory is not in the "
+                           "temp folder: %s" % staging_dir)
             return
 
         if not os.path.exists(staging_dir):
             self.log.debug("No staging directory found at: %s" % staging_dir)
             return
 
-        if instance.data.get("stagingDir_persistent"):
+        if instance.data.get("stagingDirPersistence"):
             self.log.info("Staging dir: %s should be persistent" % staging_dir)
             return
 

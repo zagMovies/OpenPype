@@ -4,10 +4,7 @@ from openpype.lib import (
     Logger,
     filter_profiles
 )
-from openpype.pipeline import (
-    tempdir,
-    Anatomy
-)
+from openpype import pipeline
 from openpype.settings import (
     get_project_settings
 )
@@ -16,11 +13,13 @@ from openpype.settings import (
 TRANSIENT_DIR_TEMPLATE = "transient"
 
 
-def get_custom_staging_dir_info(project_name, host_name, family, task_name,
-                                task_type, subset_name,
-                                project_settings=None,
-                                anatomy=None, log=None):
-    """Checks profiles if context should use special custom dir as staging.
+def get_transient_data_profile(
+        project_name, host_name, family, task_name,
+        task_type, subset_name,
+        project_settings=None,
+        anatomy=None, log=None
+):
+    """Checks profiles if context should use transient dir as staging dir.
 
     Args:
         project_name (str)
@@ -34,20 +33,30 @@ def get_custom_staging_dir_info(project_name, host_name, family, task_name,
         log (Logger) (optional)
 
     Returns:
-        Tuple[Any, Any]: Tuple of staging dir and is_persistent or None
+        Dict or None: Data with directory path and is_persistent or None
     Raises:
         ValueError - if misconfigured template should be used
     """
     settings = project_settings or get_project_settings(project_name)
-    custom_staging_dir_profiles = (settings["global"]
-                                           ["tools"]
-                                           ["publish"]
-                                           ["custom_staging_dir_profiles"])
-    if not custom_staging_dir_profiles:
-        return None, None
+
+    # TODO: remove traces of `custom_staging_dir_profiles` in the future
+    custom_staging_dir_profiles = (
+        settings["global"]["tools"]["publish"]["custom_staging_dir_profiles"]
+    )
+    transient_data_profiles = (
+        settings["global"]["transient_data_profiles"]["profiles"]
+    )
+
+    # backward compatibility
+    if not custom_staging_dir_profiles and not transient_data_profiles:
+        return
+
+    # backward compatibility
+    if custom_staging_dir_profiles:
+        transient_data_profiles += custom_staging_dir_profiles
 
     if not log:
-        log = Logger.get_logger("get_custom_staging_dir_info")
+        log = Logger.get_logger("get_transient_data_profile")
 
     filtering_criteria = {
         "hosts": host_name,
@@ -56,23 +65,30 @@ def get_custom_staging_dir_info(project_name, host_name, family, task_name,
         "task_types": task_type,
         "subsets": subset_name
     }
-    profile = filter_profiles(custom_staging_dir_profiles,
-                              filtering_criteria,
-                              logger=log)
+    profile = filter_profiles(
+        transient_data_profiles, filtering_criteria, logger=log)
 
     if not profile or not profile["active"]:
-        return None, None
+        return
 
     if not anatomy:
-        anatomy = Anatomy(project_name)
+        anatomy = pipeline.Anatomy(project_name)
 
     template_name = profile["template_name"] or TRANSIENT_DIR_TEMPLATE
     _validate_transient_template(project_name, template_name, anatomy)
 
-    custom_staging_dir = anatomy.templates[template_name]["folder"]
-    is_persistent = profile["custom_staging_dir_persistent"]
+    transient_template = anatomy.templates[template_name]["folder"]
+    data_persistence = (
+        # TODO: make this compulsory in the future
+        profile.get("data_persistence")
+        # maintain backwards compatibility
+        or profile.get("custom_staging_dir_persistent")
+    )
 
-    return custom_staging_dir, is_persistent
+    return {
+        "transient_template": transient_template,
+        "transient_persistence": data_persistence
+    }
 
 
 def _validate_transient_template(project_name, template_name, anatomy):
@@ -127,7 +143,7 @@ def get_instance_staging_dir(instance):
     anatomy = instance.context.data.get("anatomy")
 
     # get customized tempdir path from `OPENPYPE_TMPDIR` env var
-    custom_temp_dir = tempdir.create_custom_tempdir(
+    custom_temp_dir = pipeline.create_custom_tempdir(
         anatomy.project_name, anatomy)
 
     if custom_temp_dir:
