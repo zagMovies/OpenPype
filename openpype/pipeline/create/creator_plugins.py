@@ -22,8 +22,9 @@ from openpype.pipeline.plugin_discover import (
 from openpype.client import (
     get_asset_by_name
 )
+from openpype.pipeline.template_data import get_task_type
+
 from .subset_name import get_subset_name
-from ..template_data import get_task_type
 from .legacy_create import LegacyCreator
 
 
