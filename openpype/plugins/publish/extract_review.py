@@ -20,13 +20,13 @@ from openpype.lib.transcoding import (
     IMAGE_EXTENSIONS,
     get_ffprobe_streams,
     should_convert_for_ffmpeg,
-    convert_input_paths_for_ffmpeg,
-    get_transcode_temp_directory,
+    convert_input_paths_for_ffmpeg
 )
-from openpype.pipeline.publish import (
-    KnownPublishError,
-    get_publish_instance_label,
+from openpype.pipeline import (
+    publish,
+    get_staging_dir
 )
+
 from openpype.pipeline.publish.lib import add_repre_files_for_cleanup
 
 
@@ -207,7 +207,7 @@ class ExtractReview(pyblish.api.InstancePlugin):
         return filtered_defs
 
     def main_process(self, instance):
-        instance_label = get_publish_instance_label(instance)
+        instance_label = publish.get_publish_instance_label(instance)
         self.log.debug("Processing instance \"{}\"".format(instance_label))
         profile_outputs = self._get_outputs_for_instance(instance)
         if not profile_outputs:
@@ -271,7 +271,11 @@ class ExtractReview(pyblish.api.InstancePlugin):
             #   - change staging dir of source representation
             #   - must be set back after output definitions processing
             if do_convert:
-                new_staging_dir = get_transcode_temp_directory()
+                new_staging_dir = get_staging_dir(
+                    project_name=instance.context.data["projectName"],
+                    make_local=True,
+                    prefix="op_transcoding_"
+                )
                 repre["stagingDir"] = new_staging_dir
 
                 convert_input_paths_for_ffmpeg(
@@ -820,12 +824,12 @@ class ExtractReview(pyblish.api.InstancePlugin):
                 is done.
 
         Raises:
-            KnownPublishError: if more than one collection is obtained.
+            publish.KnownPublishError: if more than one collection is obtained.
         """
 
         collections = clique.assemble(files)[0]
         if len(collections) != 1:
-            raise KnownPublishError(
+            raise publish.KnownPublishError(
                 "Multiple collections {} found.".format(collections))
 
         col = collections[0]
@@ -848,7 +852,7 @@ class ExtractReview(pyblish.api.InstancePlugin):
             hole_fpath = os.path.join(staging_dir, col_format % hole_frame)
             src_fpath = os.path.join(staging_dir, col_format % src_frame)
             if not os.path.isfile(src_fpath):
-                raise KnownPublishError(
+                raise publish.KnownPublishError(
                     "Missing previously detected file: {}".format(src_fpath))
 
             speedcopy.copyfile(src_fpath, hole_fpath)
