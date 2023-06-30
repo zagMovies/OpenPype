@@ -20,7 +20,7 @@ from openpype.settings import (
 )
 from openpype.pipeline import (
     get_transient_data_profile,
-    get_instance_staging_dir
+    get_instance_staging_dir as _get_instance_staging_dir
 )
 
 from openpype.pipeline.plugin_discover import DiscoverResult
@@ -696,7 +696,7 @@ def get_custom_staging_dir_info(*args, **kwargs):
 # deprecated: backward compatibility only
 # TODO: remove in the future
 def get_instance_staging_dir(instance):
-    return get_instance_staging_dir(instance)
+    return _get_instance_staging_dir(instance)
 
 
 def get_publish_repre_path(instance, repre, only_published=False):
