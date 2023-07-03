@@ -24,7 +24,7 @@ class CollectManagedStagingDir(pyblish.api.InstancePlugin):
     where is desirable to have temporary renders in specific,
     persistent folders, could be on disks optimized for speed for example.
 
-    It is studio responsibility to clean up obsolete folders with data.
+    It is studio's responsibility to clean up obsolete folders with data.
 
     Location of the folder is configured in:
         `project_anatomy/templates/staging_dir`.
