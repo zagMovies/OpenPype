@@ -87,6 +87,12 @@ class CollectManagedStagingDir(pyblish.api.InstancePlugin):
             staging_dir_profile["template"]
         ).format(formatting_data)
 
+        if not os.path.exists(staging_dir):
+            self.log.info(
+                "Creating staging dir: {}".format(staging_dir)
+            )
+            os.makedirs(staging_dir)
+
         # apply staging dir to instance
         instance.data["stagingDir"] = staging_dir
 
