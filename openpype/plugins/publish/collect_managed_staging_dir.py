@@ -49,7 +49,7 @@ class CollectManagedStagingDir(pyblish.api.InstancePlugin):
             task.get("type"), subset_name, project_settings=project_settings,
             anatomy=anatomy, log=self.log)
 
-        if staging_dir_profile:
+        if not staging_dir_profile:
             self.log.info("No matching profile for staging dir found ...")
             # debug info
             self.log.debug("project: {}".format(project_name))
