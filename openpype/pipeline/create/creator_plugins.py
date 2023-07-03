@@ -633,7 +633,8 @@ class Creator(BaseCreator):
 
         # task can be optional in tray publisher
         task_name = instance.get("task")
-        task_type = task_type or self.get_task_type(task_name)
+        asset_name = instance.get("asset")
+        task_type = task_type or self.get_task_type(task_name, asset_name)
 
         return _get_staging_dir_profile(
             self.project_name,
@@ -646,11 +647,12 @@ class Creator(BaseCreator):
             anatomy=self.project_anatomy, log=self.log
         )
 
-    def get_task_type(self, task_name=None):
+    def get_task_type(self, task_name=None, asset_name=None):
         """Get task type from task name.
 
         Args:
             task_name (str)[optional]: Task name.
+            asset_name (str)[optional]: Asset name.
 
         Returns:
             str: Task type.
@@ -659,8 +661,8 @@ class Creator(BaseCreator):
             return None
 
         create_context = self.create_context
+        asset_name = asset_name or create_context.get_current_asset_name()
         project_name = create_context.get_current_project_name()
-        asset_name = create_context.get_current_asset_name()
         task_name = create_context.get_current_task_name()
 
         asset_doc = get_asset_by_name(project_name, asset_name)
