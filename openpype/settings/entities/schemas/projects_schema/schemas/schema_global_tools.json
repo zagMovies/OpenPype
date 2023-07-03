@@ -410,13 +410,9 @@
                     }
                 },
                 {
-                    "type": "label",
-                    "label": "<b>Custom Staging Dir Profiles</b>: profiles were moved to: <a href=\"settings://project_settings/global/transient_data_profiles/profiles\">transient_data_profiles/profiles</a>. Please move all values there as soon as possible."
-                },
-                {
                     "type": "list",
                     "key": "custom_staging_dir_profiles",
-                    "label": "Custom Staging Dir Profiles",
+                    "label": "Staging Dir Profiles",
                     "use_label_wrap": true,
                     "docstring": "Profiles to specify special location and persistence for staging dir. Could be used in Creators and Publish phase!",
                     "object_type": {
@@ -464,16 +460,26 @@
                                 "type": "separator"
                             },
                             {
-                                "key": "custom_staging_dir_persistent",
-                                "label": "Custom Staging Folder Persistent",
+                                "key": "data_persistence",
+                                "label": "Folder is persistent",
                                 "type": "boolean",
                                 "default": false
+                            },
+                            {
+                                "key": "template",
+                                "label": "Template",
+                                "type": "text",
+                                "placeholder": "{root[work]}/{staging_dir}/{asset}/{subset}/{version}"
+                            },
+                            {
+                                "type": "label",
+                                "label": "<b>Template name</b>: usually used only for templates which needs to be shared <br>between multiple profiles. Set name of previously defined template within <br>this section <a href=\"settings://project_anatomy/templates/staging_dir\">project_anatomy/templates/staging_dir</a>."
                             },
                             {
                                 "key": "template_name",
                                 "label": "Template Name",
                                 "type": "text",
-                                "placeholder": "transient"
+                                "placeholder": "Shared template: use project_anatomy/templates/staging_dir"
                             }
                         ]
                     }

@@ -19,6 +19,9 @@ from openpype.pipeline.plugin_discover import (
     deregister_plugin,
     deregister_plugin_path
 )
+from openpype.pipeline import (
+    get_staging_dir_profile as _get_staging_dir_profile
+)
 from openpype.client import (
     get_asset_by_name
 )
@@ -615,8 +618,8 @@ class Creator(BaseCreator):
         """
         return self.pre_create_attr_defs
 
-    def get_transient_data_profile(self, instance, task_type=None):
-        """Transient data directory profile.
+    def get_staging_dir_profile(self, instance, task_type=None):
+        """Get staging directory profile.
 
         Arguments:
             instance (CreatedInstance): Instance for which we want to get
@@ -627,13 +630,13 @@ class Creator(BaseCreator):
         Raises:
             ValueError - if misconfigured template should be used
         """
-        from openpype.pipeline import get_transient_data_profile
 
         # task can be optional in tray publisher
         task_name = instance.get("task")
-        task_type = task_type or self.get_task_type(task_name)
+        asset_name = instance.get("asset")
+        task_type = task_type or self.get_task_type(task_name, asset_name)
 
-        return get_transient_data_profile(
+        return _get_staging_dir_profile(
             self.project_name,
             self.host_name,
             self.family,
@@ -644,11 +647,12 @@ class Creator(BaseCreator):
             anatomy=self.project_anatomy, log=self.log
         )
 
-    def get_task_type(self, task_name=None):
+    def get_task_type(self, task_name=None, asset_name=None):
         """Get task type from task name.
 
         Args:
             task_name (str)[optional]: Task name.
+            asset_name (str)[optional]: Asset name.
 
         Returns:
             str: Task type.
@@ -657,8 +661,8 @@ class Creator(BaseCreator):
             return None
 
         create_context = self.create_context
+        asset_name = asset_name or create_context.get_current_asset_name()
         project_name = create_context.get_current_project_name()
-        asset_name = create_context.get_current_asset_name()
         task_name = create_context.get_current_task_name()
 
         asset_doc = get_asset_by_name(project_name, asset_name)

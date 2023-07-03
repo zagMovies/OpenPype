@@ -10,16 +10,16 @@ from openpype.settings import (
 )
 
 
-TRANSIENT_DIR_TEMPLATE = "transient"
+STAGING_DIR_TEMPLATES = "staging_dir"
 
 
-def get_transient_data_profile(
+def get_staging_dir_profile(
         project_name, host_name, family, task_name,
         task_type, subset_name,
         project_settings=None,
         anatomy=None, log=None
 ):
-    """Checks profiles if context should use transient dir as staging dir.
+    """Get matching staging dir profiles.
 
     Args:
         project_name (str)
@@ -39,24 +39,15 @@ def get_transient_data_profile(
     """
     settings = project_settings or get_project_settings(project_name)
 
-    # TODO: remove traces of `custom_staging_dir_profiles` in the future
-    custom_staging_dir_profiles = (
+    staging_dir_profiles = (
         settings["global"]["tools"]["publish"]["custom_staging_dir_profiles"]
     )
-    transient_data_profiles = (
-        settings["global"]["transient_data_profiles"]["profiles"]
-    )
 
-    # backward compatibility
-    if not custom_staging_dir_profiles and not transient_data_profiles:
+    if not staging_dir_profiles:
         return
 
-    # backward compatibility
-    if custom_staging_dir_profiles:
-        transient_data_profiles += custom_staging_dir_profiles
-
     if not log:
-        log = Logger.get_logger("get_transient_data_profile")
+        log = Logger.get_logger("get_staging_dir_profile")
 
     filtering_criteria = {
         "hosts": host_name,
@@ -66,7 +57,7 @@ def get_transient_data_profile(
         "subsets": subset_name
     }
     profile = filter_profiles(
-        transient_data_profiles, filtering_criteria, logger=log)
+        staging_dir_profiles, filtering_criteria, logger=log)
 
     if not profile or not profile["active"]:
         return
@@ -74,10 +65,25 @@ def get_transient_data_profile(
     if not anatomy:
         anatomy = pipeline.Anatomy(project_name)
 
-    template_name = profile["template_name"] or TRANSIENT_DIR_TEMPLATE
-    _validate_transient_template(project_name, template_name, anatomy)
+    if not profile.get("template"):
+        template_name = profile["template_name"]
+        _validate_template_name(project_name, template_name, anatomy)
 
-    transient_template = anatomy.templates[template_name]["folder"]
+        template = (
+            anatomy.templates[STAGING_DIR_TEMPLATES][template_name])
+    else:
+        template = profile["template"]
+
+    if not template:
+        # template should always be found either from anatomy or from profile
+        raise ValueError(
+            "Staging dir profile is misconfigured! "
+            "No template was found for profile! "
+            "Check your project settings at: "
+            "'project_settings/global/tools/publish/"
+            "custom_staging_dir_profiles'"
+        )
+
     data_persistence = (
         # TODO: make this compulsory in the future
         profile.get("data_persistence")
@@ -86,27 +92,29 @@ def get_transient_data_profile(
     )
 
     return {
-        "transient_template": transient_template,
-        "transient_persistence": data_persistence
+        "template": template,
+        "persistence": data_persistence
     }
 
 
-def _validate_transient_template(project_name, template_name, anatomy):
-    """Check that transient template is correctly configured.
+def _validate_template_name(project_name, template_name, anatomy):
+    """Check that staging dir section with appropriate template exist.
 
     Raises:
         ValueError - if misconfigured template
     """
-    if template_name not in anatomy.templates:
+    # TODO: only for backward compatibility of anatomy for older projects
+    if STAGING_DIR_TEMPLATES not in anatomy.templates:
         raise ValueError((
             "Anatomy of project \"{}\" does not have set"
-            " \"{}\" template key!").format(project_name, template_name)
+            " \"{}\" template section!").format(project_name, template_name)
         )
 
-    if "folder" not in anatomy.templates[template_name]:
+    if template_name not in anatomy.templates[STAGING_DIR_TEMPLATES]:
         raise ValueError((
-            "There is not set \"folder\" template in \"{}\" anatomy"
-            " for project \"{}\".").format(template_name, project_name)
+            "Anatomy of project \"{}\" does not have set"
+            " \"{}\" template key at Staging Dir section!").format(
+                project_name, template_name)
         )
 
 
@@ -115,6 +123,35 @@ def get_instance_staging_dir(instance):
 
     First check if 'stagingDir' is already set in instance data.
     In case there already is new tempdir will not be created.
+
+    Returns:
+        str: Path to staging dir
+    """
+    anatomy = instance.context.data.get("anatomy")
+    staging_dir = instance.data.get('stagingDir')
+
+    if not staging_dir:
+        staging_dir = get_staging_dir(
+            project_name=instance.context.data["projectName"],
+            anatomy=anatomy
+        )
+
+    instance.data['stagingDir'] = staging_dir
+
+    return staging_dir
+
+
+def get_staging_dir(
+        project_name=None,
+        anatomy=None,
+        prefix=None, suffix=None,
+        make_local=False
+):
+    """Get staging dir path.
+
+    If `make_local` is set, tempdir will be created in local tempdir.
+    If `anatomy` is not set, default anatomy will be used.
+    If `prefix` or `suffix` is not set, default values will be used.
 
     It also supports `OPENPYPE_TMPDIR`, so studio can define own temp
     shared repository per project or even per more granular context.
@@ -130,33 +167,46 @@ def get_instance_staging_dir(instance):
         about its usage.
 
     Args:
-        instance (pyblish.lib.Instance): Instance for which we want to get
-            staging dir.
+        project_name (str)[optional]: Name of project.
+        anatomy (openpype.pipeline.Anatomy)[optional]: Anatomy object.
+        make_local (bool)[optional]: If True, staging dir will be created in
+            local tempdir.
+        suffix (str)[optional]: Suffix for tempdir.
+        prefix (str)[optional]: Prefix for tempdir.
 
     Returns:
         str: Path to staging dir of instance.
     """
-    staging_dir = instance.data.get('stagingDir')
-    if staging_dir:
-        return staging_dir
+    prefix = prefix or "op_tmp_"
+    suffix = suffix or ""
 
-    anatomy = instance.context.data.get("anatomy")
+    if make_local:
+        return _create_local_staging_dir(prefix, suffix)
+
+    # make sure anatomy is set
+    if not anatomy:
+        anatomy = pipeline.Anatomy(project_name)
 
     # get customized tempdir path from `OPENPYPE_TMPDIR` env var
     custom_temp_dir = pipeline.create_custom_tempdir(
         anatomy.project_name, anatomy)
 
     if custom_temp_dir:
-        staging_dir = os.path.normpath(
+        return os.path.normpath(
             tempfile.mkdtemp(
-                prefix="pyblish_tmp_",
+                prefix=prefix,
+                suffix=suffix,
                 dir=custom_temp_dir
             )
         )
     else:
-        staging_dir = os.path.normpath(
-            tempfile.mkdtemp(prefix="pyblish_tmp_")
-        )
-    instance.data['stagingDir'] = staging_dir
+        return _create_local_staging_dir(prefix, suffix)
 
-    return staging_dir
+
+def _create_local_staging_dir(prefix, suffix):
+    return os.path.normpath(
+        tempfile.mkdtemp(
+            prefix=prefix,
+            suffix=suffix
+        )
+    )

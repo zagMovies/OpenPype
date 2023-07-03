@@ -3,15 +3,17 @@ import copy
 import clique
 import pyblish.api
 
-from openpype.pipeline import publish
+from openpype.pipeline import (
+    publish,
+    get_staging_dir
+)
 from openpype.lib import (
 
     is_oiio_supported,
 )
 
 from openpype.lib.transcoding import (
-    convert_colorspace,
-    get_transcode_temp_directory,
+    convert_colorspace
 )
 
 from openpype.lib.profiles_filtering import filter_profiles
@@ -102,7 +104,11 @@ class ExtractOIIOTranscode(publish.Extractor):
                 new_repre = copy.deepcopy(repre)
 
                 original_staging_dir = new_repre["stagingDir"]
-                new_staging_dir = get_transcode_temp_directory()
+                new_staging_dir = get_staging_dir(
+                    project_name=instance.context.data["projectName"],
+                    make_local=True,
+                    prefix="op_transcoding_"
+                )
                 new_repre["stagingDir"] = new_staging_dir
 
                 if isinstance(new_repre["files"], list):
