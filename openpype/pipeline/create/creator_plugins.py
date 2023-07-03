@@ -629,6 +629,9 @@ class Creator(BaseCreator):
         Args:
             instance (CreatedInstance): Instance for which should be staging
                 dir applied.
+
+        Returns:
+            str: Path to staging dir.
         """
         create_ctx = self.create_context
         asset_name = (
@@ -678,6 +681,8 @@ class Creator(BaseCreator):
 
         if persistence:
             transient_data["stagingDirPersistence"] = persistence
+
+        return staging_dir_path
 
     def _format_staging_dir_template(self, template, formatting_data):
         """Format staging dir template with instance data.
