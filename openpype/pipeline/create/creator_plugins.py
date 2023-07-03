@@ -11,7 +11,10 @@ from abc import (
 import six
 
 from openpype.settings import get_system_settings, get_project_settings
-from openpype.lib import Logger
+from openpype.lib import (
+    Logger,
+    StringTemplate
+)
 from openpype.pipeline.plugin_discover import (
     discover,
     register_plugin,
@@ -618,56 +621,93 @@ class Creator(BaseCreator):
         """
         return self.pre_create_attr_defs
 
-    def get_staging_dir_profile(self, instance, task_type=None):
+    def apply_staging_dir(self, instance):
+        """Apply staging dir to instance.
+
+        Method is called on instance creation and on instance update.
+
+        Args:
+            instance (CreatedInstance): Instance for which should be staging
+                dir applied.
+        """
+        create_ctx = self.create_context
+        asset_name = (
+            instance.get("asset") or create_ctx.get_current_asset_name())
+        project_name = create_ctx.get_current_project_name()
+        task_name = instance.get("task")
+
+        ctx_data = {
+            "asset": asset_name,
+            "subset": instance["subset"],
+            "project": {
+                "name": project_name,
+                "code": self.project_anatomy.project_code
+            },
+            "host": self.host_name,
+            "family": self.family
+        }
+
+        if task_name:
+            asset_doc = get_asset_by_name(
+                project_name,
+                asset_name
+            )
+            task_type = get_task_type(asset_doc, task_name)
+            if task_type:
+                ctx_data["task"] = {
+                    "name": task_name,
+                    "type": task_type
+                }
+
+        template, persistence = self.get_staging_dir_profile(
+            instance, ctx_data)
+
+        if not template:
+            return
+
+        # format template with instance data
+        staging_dir_path = self._format_staging_dir_template(
+            template, instance)
+
+        transient_data = instance.transient_data
+
+        if not os.path.exists(staging_dir_path):
+            os.makedirs(staging_dir_path)
+
+        transient_data["stagingDir"] = staging_dir_path
+
+        if persistence:
+            transient_data["stagingDirPersistence"] = persistence
+
+    def _format_staging_dir_template(self, template, formatting_data):
+        """Format staging dir template with instance data.
+
+        Args:
+            template (Str): Template to format.
+            formatting_data (Dict): contextual formatting data.
+        """
+        return StringTemplate(template).format(formatting_data)
+
+    def get_staging_dir_profile(self, instance_data):
         """Get staging directory profile.
 
         Arguments:
-            instance (CreatedInstance): Instance for which we want to get
-                staging dir.
-            task_type (str): Task type. If not set it will be queried from
+            instance_data (Dict): Instance context data
         Returns:
             Dict or None: Data with template and persistance flag or None
         Raises:
             ValueError - if misconfigured template should be used
         """
-
-        # task can be optional in tray publisher
-        task_name = instance.get("task")
-        asset_name = instance.get("asset")
-        task_type = task_type or self.get_task_type(task_name, asset_name)
-
         return _get_staging_dir_profile(
-            self.project_name,
-            self.host_name,
-            self.family,
-            task_name,
-            task_type,
-            instance["subset"],
+            instance_data["project"]["name"],
+            instance_data["host"],
+            instance_data["family"],
+            instance_data.get("task", {}).get("name"),
+            instance_data.get("task", {}).get("type"),
+            instance_data["subset"],
             project_settings=self.project_settings,
             anatomy=self.project_anatomy, log=self.log
         )
-
-    def get_task_type(self, task_name=None, asset_name=None):
-        """Get task type from task name.
-
-        Args:
-            task_name (str)[optional]: Task name.
-            asset_name (str)[optional]: Asset name.
-
-        Returns:
-            str: Task type.
-        """
-        if not task_name:
-            return None
-
-        create_context = self.create_context
-        asset_name = asset_name or create_context.get_current_asset_name()
-        project_name = create_context.get_current_project_name()
-        task_name = create_context.get_current_task_name()
-
-        asset_doc = get_asset_by_name(project_name, asset_name)
-
-        return get_task_type(asset_doc, task_name)
 
 
 class HiddenCreator(BaseCreator):
