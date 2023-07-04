@@ -22,9 +22,10 @@ from openpype.lib.transcoding import (
     should_convert_for_ffmpeg,
     convert_input_paths_for_ffmpeg
 )
-from openpype.pipeline import (
-    publish,
-    get_temp_dir
+from openpype.pipeline import get_temp_dir
+from openpype.pipeline.publish import (
+    KnownPublishError,
+    get_publish_instance_label,
 )
 
 from openpype.pipeline.publish.lib import add_repre_files_for_cleanup
@@ -207,7 +208,7 @@ class ExtractReview(pyblish.api.InstancePlugin):
         return filtered_defs
 
     def main_process(self, instance):
-        instance_label = publish.get_publish_instance_label(instance)
+        instance_label = get_publish_instance_label(instance)
         self.log.debug("Processing instance \"{}\"".format(instance_label))
         profile_outputs = self._get_outputs_for_instance(instance)
         if not profile_outputs:
@@ -829,7 +830,7 @@ class ExtractReview(pyblish.api.InstancePlugin):
 
         collections = clique.assemble(files)[0]
         if len(collections) != 1:
-            raise publish.KnownPublishError(
+            raise KnownPublishError(
                 "Multiple collections {} found.".format(collections))
 
         col = collections[0]
