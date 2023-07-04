@@ -825,7 +825,7 @@ class ExtractReview(pyblish.api.InstancePlugin):
                 is done.
 
         Raises:
-            publish.KnownPublishError: if more than one collection is obtained.
+            KnownPublishError: if more than one collection is obtained.
         """
 
         collections = clique.assemble(files)[0]
@@ -853,7 +853,7 @@ class ExtractReview(pyblish.api.InstancePlugin):
             hole_fpath = os.path.join(staging_dir, col_format % hole_frame)
             src_fpath = os.path.join(staging_dir, col_format % src_frame)
             if not os.path.isfile(src_fpath):
-                raise publish.KnownPublishError(
+                raise KnownPublishError(
                     "Missing previously detected file: {}".format(src_fpath))
 
             speedcopy.copyfile(src_fpath, hole_fpath)

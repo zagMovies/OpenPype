@@ -8,13 +8,9 @@ Provides:
                       -> stagingDirPersistence (bool)
                       -> stagingDir_persistent (bool) [deprecated]
 """
-import copy
-import os.path
-
 import pyblish.api
 
 from openpype.pipeline.publish import get_instance_staging_dir
-from openpype.lib import StringTemplate
 
 
 class CollectManagedStagingDir(pyblish.api.InstancePlugin):

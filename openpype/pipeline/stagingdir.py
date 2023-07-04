@@ -1,4 +1,3 @@
-import os
 from openpype.lib import (
     Logger,
     filter_profiles,
@@ -124,7 +123,7 @@ def get_staging_dir(
         project_settings=None,
         system_settings=None,
         **kwargs
-    ):
+):
     """Get staging dir data.
 
     If `force_temp` is set, staging dir will be created as tempdir.
