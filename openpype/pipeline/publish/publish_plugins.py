@@ -9,9 +9,9 @@ from openpype.lib import BoolDef
 from .lib import (
     load_help_content_from_plugin,
     get_errored_instances_from_context,
-    get_errored_plugins_from_context
+    get_errored_plugins_from_context,
+    get_instance_staging_dir
 )
-from openpype.pipeline.publish import get_instance_staging_dir
 from openpype.pipeline.colorspace import (
     get_imageio_colorspace_from_filepath,
     get_imageio_config,

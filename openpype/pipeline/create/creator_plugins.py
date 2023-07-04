@@ -7,7 +7,6 @@ from abc import (
     abstractmethod,
     abstractproperty
 )
-
 import six
 
 from openpype.settings import get_system_settings, get_project_settings
@@ -628,9 +627,12 @@ class Creator(BaseCreator):
         create_ctx = self.create_context
         asset_name = instance.get("asset")
         subset = instance.get("subset")
-
         if not any([asset_name, subset]):
             return None
+
+        version = instance.get("version")
+        if version is not None:
+            formatting_data = {"version": version}
 
         project_name = create_ctx.get_current_project_name()
         task_name = instance.get("task")
@@ -641,7 +643,8 @@ class Creator(BaseCreator):
             project_settings=self.project_settings,
             system_settings=self.system_settings,
             always_return_path=False,
-            log=self.log
+            log=self.log,
+            formatting_data=formatting_data,
         )
 
         if not dir_data:
