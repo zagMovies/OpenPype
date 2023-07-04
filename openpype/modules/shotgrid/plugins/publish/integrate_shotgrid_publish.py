@@ -1,4 +1,5 @@
 import os
+from py import log
 import pyblish.api
 
 from openpype.pipeline.publish import get_publish_repre_path

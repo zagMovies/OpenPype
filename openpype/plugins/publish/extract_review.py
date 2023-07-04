@@ -24,7 +24,7 @@ from openpype.lib.transcoding import (
 )
 from openpype.pipeline import (
     publish,
-    get_staging_dir
+    get_temp_dir
 )
 
 from openpype.pipeline.publish.lib import add_repre_files_for_cleanup
@@ -271,7 +271,7 @@ class ExtractReview(pyblish.api.InstancePlugin):
             #   - change staging dir of source representation
             #   - must be set back after output definitions processing
             if do_convert:
-                new_staging_dir = get_staging_dir(
+                new_staging_dir = get_temp_dir(
                     project_name=instance.context.data["projectName"],
                     make_local=True,
                     prefix="op_transcoding_"

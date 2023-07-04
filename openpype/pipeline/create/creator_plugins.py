@@ -11,10 +11,7 @@ from abc import (
 import six
 
 from openpype.settings import get_system_settings, get_project_settings
-from openpype.lib import (
-    Logger,
-    StringTemplate
-)
+from openpype.lib import Logger
 from openpype.pipeline.plugin_discover import (
     discover,
     register_plugin,
@@ -22,10 +19,7 @@ from openpype.pipeline.plugin_discover import (
     deregister_plugin,
     deregister_plugin_path
 )
-from openpype.pipeline import (
-    get_staging_dir_profile as _get_staging_dir_profile
-)
-from openpype.pipeline.template_data import get_template_data_with_names
+from openpype.pipeline import get_staging_dir
 
 from .subset_name import get_subset_name
 from .legacy_create import LegacyCreator
@@ -620,7 +614,7 @@ class Creator(BaseCreator):
         return self.pre_create_attr_defs
 
     def apply_staging_dir(self, instance):
-        """Apply staging dir to instance.
+        """Apply staging dir with persistence to instance's transient data.
 
         Method is called on instance creation and on instance update.
 
@@ -636,70 +630,35 @@ class Creator(BaseCreator):
         subset = instance.get("subset")
 
         if not any([asset_name, subset]):
-            return
+            return None
 
         project_name = create_ctx.get_current_project_name()
         task_name = instance.get("task")
 
-        ctx_data = get_template_data_with_names(
-            project_name, asset_name, task_name, self.system_settings)
-        ctx_data.update({
-            "subset": subset,
-            "host": self.host_name,
-            "family": self.family
-        })
+        dir_data = get_staging_dir(
+            project_name, asset_name, self.host_name, self.family,
+            task_name, subset, self.project_anatomy,
+            project_settings=self.project_settings,
+            system_settings=self.system_settings,
+            always_get_some_dir=False,
+            log=self.log
+        )
 
-        template, persistence = self.get_staging_dir_profile(
-            instance, ctx_data)
+        if not dir_data:
+            return None
 
-        if not template:
-            return
-
-        # format template with instance data
-        staging_dir_path = self._format_staging_dir_template(
-            template, instance)
-
-        transient_data = instance.transient_data
+        staging_dir_path = dir_data["stagingDir"]
 
         if not os.path.exists(staging_dir_path):
             os.makedirs(staging_dir_path)
 
-        transient_data["stagingDir"] = staging_dir_path
+        instance.transient_data.update(dir_data)
 
-        if persistence:
-            transient_data["stagingDirPersistence"] = persistence
+        self.log.info(
+            "Applied staging dir to instance: {}".format(staging_dir_path)
+        )
 
         return staging_dir_path
-
-    def _format_staging_dir_template(self, template, formatting_data):
-        """Format staging dir template with instance data.
-
-        Args:
-            template (Str): Template to format.
-            formatting_data (Dict): contextual formatting data.
-        """
-        return StringTemplate(template).format(formatting_data)
-
-    def get_staging_dir_profile(self, instance_data):
-        """Get staging directory profile.
-
-        Arguments:
-            instance_data (Dict): Instance context data
-        Returns:
-            Dict or None: Data with template and persistance flag or None
-        Raises:
-            ValueError - if misconfigured template should be used
-        """
-        return _get_staging_dir_profile(
-            instance_data["project"]["name"],
-            instance_data["host"],
-            instance_data["family"],
-            instance_data.get("task", {}).get("name"),
-            instance_data.get("task", {}).get("type"),
-            instance_data["subset"],
-            project_settings=self.project_settings,
-            anatomy=self.project_anatomy, log=self.log
-        )
 
 
 class HiddenCreator(BaseCreator):

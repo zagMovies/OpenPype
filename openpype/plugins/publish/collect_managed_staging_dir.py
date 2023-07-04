@@ -13,7 +13,7 @@ import os.path
 
 import pyblish.api
 
-from openpype.pipeline import get_staging_dir_profile
+from openpype.pipeline import get_staging_dir_config
 from openpype.lib import StringTemplate
 
 
@@ -44,7 +44,7 @@ class CollectManagedStagingDir(pyblish.api.InstancePlugin):
         anatomy = instance.context.data["anatomy"]
         task = instance.data["anatomyData"].get("task", {})
 
-        staging_dir_profile = get_staging_dir_profile(
+        staging_dir_profile = get_staging_dir_config(
             project_name, host_name, family, task.get("name"),
             task.get("type"), subset_name, project_settings=project_settings,
             anatomy=anatomy, log=self.log)

@@ -19,7 +19,7 @@ from openpype.settings import (
     get_system_settings,
 )
 from openpype.pipeline import (
-    get_staging_dir_profile,
+    get_staging_dir_config,
     get_staging_dir
 )
 
@@ -685,7 +685,7 @@ def context_plugin_should_run(plugin, context):
 # deprecated: backward compatibility only
 # TODO: remove in the future
 def get_custom_staging_dir_info(*args, **kwargs):
-    tr_data = get_staging_dir_profile(*args, **kwargs)
+    tr_data = get_staging_dir_config(*args, **kwargs)
 
     if not tr_data:
         return None, None
@@ -702,18 +702,36 @@ def get_instance_staging_dir(instance):
     Returns:
         str: Path to staging dir
     """
-    anatomy = instance.context.data.get("anatomy")
     staging_dir = instance.data.get('stagingDir')
 
-    if not staging_dir:
-        staging_dir = get_staging_dir(
-            project_name=instance.context.data["projectName"],
-            anatomy=anatomy
-        )
+    if staging_dir:
+        return staging_dir
 
-    instance.data['stagingDir'] = staging_dir
+    family = instance.data["family"]
+    subset = instance.data["subset"]
+    asset_name = instance.data["asset"]
+    host_name = instance.context.data["hostName"]
+    project_name = instance.context.data["projectName"]
+    project_settings = instance.context.data["project_settings"]
+    system_settings = instance.context.data["system_settings"]
+    anatomy = instance.context.data["anatomy"]
+    task = instance.data["anatomyData"].get("task", {})
 
-    return staging_dir
+    dir_data = get_staging_dir(
+        project_name, asset_name, host_name, family,
+        task.get("name"), subset, anatomy,
+        project_settings=project_settings,
+        system_settings=system_settings,
+    )
+
+    staging_dir_path = dir_data["stagingDir"]
+
+    if not os.path.exists(staging_dir_path):
+        os.makedirs(staging_dir_path)
+
+    instance.data.update(dir_data)
+
+    return staging_dir_path
 
 
 def get_publish_repre_path(instance, repre, only_published=False):

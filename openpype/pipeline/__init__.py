@@ -9,10 +9,10 @@ from .mongodb import (
 )
 from .anatomy import Anatomy
 
-from .tempdir import create_custom_tempdir
+from .tempdir import get_temp_dir
 
 from .stagingdir import (
-    get_staging_dir_profile,
+    get_staging_dir_config,
     get_staging_dir
 )
 
@@ -119,10 +119,9 @@ __all__ = (
     "Anatomy",
 
     # --- Temp dir ---
-    "create_custom_tempdir",
+    "get_temp_dir",
 
     # --- Staging dir ---
-    "get_staging_dir_profile",
     "get_staging_dir",
 
     # --- Create ---

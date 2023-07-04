@@ -1,25 +1,23 @@
-import os
-import tempfile
 from openpype.lib import (
     Logger,
-    filter_profiles
+    filter_profiles,
+    StringTemplate
 )
-from openpype import pipeline
-from openpype.settings import (
-    get_project_settings
-)
-
+from openpype.settings import get_project_settings
+from .anatomy import Anatomy
+from .tempdir import get_temp_dir
+from openpype.pipeline.template_data import get_template_data_with_names
 
 STAGING_DIR_TEMPLATES = "staging_dir"
 
 
-def get_staging_dir_profile(
+def get_staging_dir_config(
         project_name, host_name, family, task_name,
         task_type, subset_name,
         project_settings=None,
         anatomy=None, log=None
 ):
-    """Get matching staging dir profiles.
+    """Get matching staging dir profile.
 
     Args:
         project_name (str)
@@ -30,10 +28,10 @@ def get_staging_dir_profile(
         subset_name (str)
         project_settings(Dict[str, Any]): Prepared project settings.
         anatomy (Dict[str, Any])
-        log (Logger) (optional)
+        log (Optional[logging.Logger])
 
     Returns:
-        Dict or None: Data with directory path and is_persistent or None
+        Dict or None: Data with directory template and is_persistent or None
     Raises:
         ValueError - if misconfigured template should be used
     """
@@ -44,10 +42,10 @@ def get_staging_dir_profile(
     )
 
     if not staging_dir_profiles:
-        return
+        return None
 
     if not log:
-        log = Logger.get_logger("get_staging_dir_profile")
+        log = Logger.get_logger("get_staging_dir_config")
 
     filtering_criteria = {
         "hosts": host_name,
@@ -60,10 +58,10 @@ def get_staging_dir_profile(
         staging_dir_profiles, filtering_criteria, logger=log)
 
     if not profile or not profile["active"]:
-        return
+        return None
 
     if not anatomy:
-        anatomy = pipeline.Anatomy(project_name)
+        anatomy = Anatomy(project_name)
 
     if not profile.get("template"):
         template_name = profile["template_name"]
@@ -117,72 +115,85 @@ def _validate_template_name(project_name, template_name, anatomy):
                 project_name, template_name)
         )
 
-def get_staging_dir(
-        project_name=None,
-        anatomy=None,
-        prefix=None, suffix=None,
-        make_local=False
-):
-    """Get staging dir path.
 
-    If `make_local` is set, tempdir will be created in local tempdir.
-    If `anatomy` is not set, default anatomy will be used.
+def get_staging_dir(
+        project_name, asset_name, host_name,
+        family, task_name, subset, anatomy,
+        project_settings=None,
+        system_settings=None,
+        force_temp=False,
+        always_get_some_dir=True,
+        prefix=None,
+        suffix=None,
+        log=None,
+):
+    """Get staging dir data.
+
+    If `force_temp` is set, staging dir will be created as tempdir.
+    If `always_get_some_dir` is set, staging dir will be created as tempdir if
+    no staging dir profile is found.
     If `prefix` or `suffix` is not set, default values will be used.
 
-    It also supports `OPENPYPE_TMPDIR`, so studio can define own temp
-    shared repository per project or even per more granular context.
-    Template formatting is supported also with optional keys. Folder is
-    created in case it doesn't exists.
-
-    Available anatomy formatting keys:
-        - root[work | <root name key>]
-        - project[name | code]
-
-    Note:
-        Staging dir does not have to be necessarily in tempdir so be careful
-        about its usage.
-
-    Args:
-        project_name (str)[optional]: Name of project.
-        anatomy (openpype.pipeline.Anatomy)[optional]: Anatomy object.
-        make_local (bool)[optional]: If True, staging dir will be created in
-            local tempdir.
-        suffix (str)[optional]: Suffix for tempdir.
-        prefix (str)[optional]: Prefix for tempdir.
+    Arguments:
+        project_name (str)
+        asset_name (str)
+        host_name (str)
+        family (str)
+        task_name (str)
+        subset (str)
+        anatomy (Dict[str, Any])
+        project_settings (Dict[str, Any])
+        system_settings (Dict[str, Any])
+        force_temp (bool)
+        always_get_some_dir (bool)
+        prefix (str)
+        suffix (str)
+        log (Optional[logging.Logger])
 
     Returns:
-        str: Path to staging dir of instance.
+        Dict[str, Any]: Staging dir data
     """
-    prefix = prefix or "op_tmp_"
-    suffix = suffix or ""
 
-    if make_local:
-        return _create_local_staging_dir(prefix, suffix)
+    if not log:
+        log = Logger.get_logger("get_staging_dir")
 
-    # make sure anatomy is set
-    if not anatomy:
-        anatomy = pipeline.Anatomy(project_name)
-
-    # get customized tempdir path from `OPENPYPE_TMPDIR` env var
-    custom_temp_dir = pipeline.create_custom_tempdir(
-        anatomy.project_name, anatomy)
-
-    if custom_temp_dir:
-        return os.path.normpath(
-            tempfile.mkdtemp(
-                prefix=prefix,
-                suffix=suffix,
-                dir=custom_temp_dir
-            )
+    if force_temp:
+        return get_temp_dir(
+            project_name=project_name,
+            anatomy=anatomy,
+            prefix=prefix, suffix=suffix
         )
-    else:
-        return _create_local_staging_dir(prefix, suffix)
 
+    ctx_data = get_template_data_with_names(
+        project_name, asset_name, task_name, system_settings)
+    ctx_data.update({
+        "subset": subset,
+        "host": host_name,
+        "family": family
+    })
 
-def _create_local_staging_dir(prefix, suffix):
-    return os.path.normpath(
-        tempfile.mkdtemp(
-            prefix=prefix,
-            suffix=suffix
-        )
+    # get staging dir config
+    staging_dir_config = get_staging_dir_config(
+        project_name, host_name, family, task_name,
+        ctx_data.get("task", {}).get("type"), subset,
+        project_settings=project_settings,
+        anatomy=anatomy, log=log
     )
+
+    # if no preset matching and always_get_some_dir is set, return tempdir
+    if not staging_dir_config and always_get_some_dir:
+        return {
+            "stagingDir": get_temp_dir(
+                project_name=project_name,
+                anatomy=anatomy,
+                prefix=prefix, suffix=suffix
+            ),
+            "stagingDirPersistent": False
+        }
+
+    return {
+        "stagingDir": StringTemplate.format_template(
+            staging_dir_config["template"], ctx_data
+        ),
+        "stagingDirPersistent": staging_dir_config["persistence"]
+    }

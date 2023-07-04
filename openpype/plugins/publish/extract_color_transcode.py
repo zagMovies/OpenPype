@@ -5,7 +5,7 @@ import pyblish.api
 
 from openpype.pipeline import (
     publish,
-    get_staging_dir
+    get_temp_dir
 )
 from openpype.lib import (
 
@@ -104,7 +104,7 @@ class ExtractOIIOTranscode(publish.Extractor):
                 new_repre = copy.deepcopy(repre)
 
                 original_staging_dir = new_repre["stagingDir"]
-                new_staging_dir = get_staging_dir(
+                new_staging_dir = get_temp_dir(
                     project_name=instance.context.data["projectName"],
                     make_local=True,
                     prefix="op_transcoding_"
