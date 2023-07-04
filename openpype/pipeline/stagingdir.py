@@ -1,3 +1,4 @@
+import os
 from openpype.lib import (
     Logger,
     filter_profiles,
@@ -7,6 +8,7 @@ from openpype.settings import get_project_settings
 from .anatomy import Anatomy
 from .tempdir import get_temp_dir
 from openpype.pipeline.template_data import get_template_data_with_names
+
 
 STAGING_DIR_TEMPLATES = "staging_dir"
 
@@ -121,12 +123,8 @@ def get_staging_dir(
         family, task_name, subset, anatomy,
         project_settings=None,
         system_settings=None,
-        force_temp=False,
-        always_get_some_dir=True,
-        prefix=None,
-        suffix=None,
-        log=None,
-):
+        **kwargs
+    ):
     """Get staging dir data.
 
     If `force_temp` is set, staging dir will be created as tempdir.
@@ -135,33 +133,43 @@ def get_staging_dir(
     If `prefix` or `suffix` is not set, default values will be used.
 
     Arguments:
-        project_name (str)
-        asset_name (str)
-        host_name (str)
-        family (str)
-        task_name (str)
-        subset (str)
-        anatomy (Dict[str, Any])
-        project_settings (Dict[str, Any])
-        system_settings (Dict[str, Any])
-        force_temp (bool)
-        always_get_some_dir (bool)
-        prefix (str)
-        suffix (str)
-        log (Optional[logging.Logger])
+        project_name (str): Name of project.
+        asset_name (str): Name of asset.
+        host_name (str): Name of host.
+        family (str): Name of family.
+        task_name (str): Name of task.
+        subset (str): Name of subset.
+        anatomy (openpype.pipeline.Anatomy): Anatomy object.
+        project_settings (Dict[str, Any]): Prepared project settings.
+        system_settings (Dict[str, Any]): Prepared system settings.
+        **kwargs: Arbitrary keyword arguments. See below.
+
+    Keyword Arguments:
+        force_temp (bool): If True, staging dir will be created as tempdir.
+        always_return_path (bool): If True, staging dir will be created as
+            tempdir if no staging dir profile is found.
+        prefix (str): Prefix for staging dir.
+        suffix (str): Suffix for staging dir.
+        formatting_data (Dict[str, Any]): Data for formatting staging dir
+            template.
 
     Returns:
         Dict[str, Any]: Staging dir data
     """
 
-    if not log:
-        log = Logger.get_logger("get_staging_dir")
+    log = kwargs.get("log") or Logger.get_logger("get_staging_dir")
+    always_return_path = kwargs.get("always_return_path")
 
-    if force_temp:
+    # make sure always_return_path is set to true by default
+    if always_return_path is None:
+        always_return_path = True
+
+    if kwargs.get("force_temp"):
         return get_temp_dir(
             project_name=project_name,
             anatomy=anatomy,
-            prefix=prefix, suffix=suffix
+            prefix=kwargs.get("prefix"),
+            suffix=kwargs.get("suffix"),
         )
 
     ctx_data = get_template_data_with_names(
@@ -171,6 +179,10 @@ def get_staging_dir(
         "host": host_name,
         "family": family
     })
+    ctx_data["root"] = anatomy.roots
+
+    if kwargs.get("formatting_data"):
+        ctx_data.update(kwargs.get("formatting_data"))
 
     # get staging dir config
     staging_dir_config = get_staging_dir_config(
@@ -181,12 +193,13 @@ def get_staging_dir(
     )
 
     # if no preset matching and always_get_some_dir is set, return tempdir
-    if not staging_dir_config and always_get_some_dir:
+    if not staging_dir_config and always_return_path:
         return {
             "stagingDir": get_temp_dir(
                 project_name=project_name,
                 anatomy=anatomy,
-                prefix=prefix, suffix=suffix
+                prefix=kwargs.get("prefix"),
+                suffix=kwargs.get("suffix"),
             ),
             "stagingDirPersistent": False
         }

@@ -19,7 +19,6 @@ from openpype.settings import (
     get_system_settings,
 )
 from openpype.pipeline import (
-    get_staging_dir_config,
     get_staging_dir
 )
 
@@ -685,6 +684,8 @@ def context_plugin_should_run(plugin, context):
 # deprecated: backward compatibility only
 # TODO: remove in the future
 def get_custom_staging_dir_info(*args, **kwargs):
+    from openpype.pipeline.stagingdir import get_staging_dir_config
+
     tr_data = get_staging_dir_config(*args, **kwargs)
 
     if not tr_data:
@@ -707,21 +708,35 @@ def get_instance_staging_dir(instance):
     if staging_dir:
         return staging_dir
 
-    family = instance.data["family"]
-    subset = instance.data["subset"]
-    asset_name = instance.data["asset"]
+    anatomy_data = instance.data["anatomyData"]
+    formatting_data = copy.deepcopy(anatomy_data)
+
+    # anatomy data based variables
+    family = anatomy_data["family"]
+    subset = anatomy_data["subset"]
+    asset_name = anatomy_data["asset"]
+    project_name = anatomy_data["projectName"]
+    task = anatomy_data.get("task", {})
+
+    # context data based variables
     host_name = instance.context.data["hostName"]
-    project_name = instance.context.data["projectName"]
     project_settings = instance.context.data["project_settings"]
     system_settings = instance.context.data["system_settings"]
     anatomy = instance.context.data["anatomy"]
-    task = instance.data["anatomyData"].get("task", {})
+    current_file = instance.context.data.get("currentFile")
+
+    # add current file as workfile name into formatting data
+    if current_file:
+        workfile = os.path.basename(current_file)
+        workfile_name, _ = os.path.splitext(workfile)
+        formatting_data["workfile_name"] = workfile_name
 
     dir_data = get_staging_dir(
         project_name, asset_name, host_name, family,
         task.get("name"), subset, anatomy,
         project_settings=project_settings,
         system_settings=system_settings,
+        formatting_data=formatting_data
     )
 
     staging_dir_path = dir_data["stagingDir"]
