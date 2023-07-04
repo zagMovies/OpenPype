@@ -117,30 +117,6 @@ def _validate_template_name(project_name, template_name, anatomy):
                 project_name, template_name)
         )
 
-
-def get_instance_staging_dir(instance):
-    """Unified way how staging dir is stored and created on instances.
-
-    First check if 'stagingDir' is already set in instance data.
-    In case there already is new tempdir will not be created.
-
-    Returns:
-        str: Path to staging dir
-    """
-    anatomy = instance.context.data.get("anatomy")
-    staging_dir = instance.data.get('stagingDir')
-
-    if not staging_dir:
-        staging_dir = get_staging_dir(
-            project_name=instance.context.data["projectName"],
-            anatomy=anatomy
-        )
-
-    instance.data['stagingDir'] = staging_dir
-
-    return staging_dir
-
-
 def get_staging_dir(
         project_name=None,
         anatomy=None,

@@ -103,7 +103,7 @@ class Extractor(pyblish.api.InstancePlugin):
         Upon calling this method the staging directory is stored inside
         the instance.data['stagingDir']
         """
-        from openpype.pipeline import get_instance_staging_dir
+        from openpype.pipeline.publish import get_instance_staging_dir
 
         return get_instance_staging_dir(instance)
 

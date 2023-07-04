@@ -2,7 +2,7 @@ import os
 import copy
 import pyblish.api
 
-from openpype.pipeline import get_instance_staging_dir
+from openpype.pipeline.publish import get_instance_staging_dir
 
 import substance_painter.textureset
 from openpype.hosts.substancepainter.api.lib import (

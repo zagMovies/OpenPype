@@ -34,8 +34,7 @@ from .lib import (
 
     filter_instances_for_context_plugin,
     context_plugin_should_run,
-    # TODO: remove in the future
-    # only maintained for backward compatibility
+
     get_instance_staging_dir,
     get_publish_repre_path,
 
