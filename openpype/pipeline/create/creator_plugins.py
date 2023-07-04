@@ -25,10 +25,7 @@ from openpype.pipeline.plugin_discover import (
 from openpype.pipeline import (
     get_staging_dir_profile as _get_staging_dir_profile
 )
-from openpype.client import (
-    get_asset_by_name
-)
-from openpype.pipeline.template_data import get_task_type
+from openpype.pipeline.template_data import get_template_data_with_names
 
 from .subset_name import get_subset_name
 from .legacy_create import LegacyCreator
@@ -212,6 +209,7 @@ class BaseCreator:
         # Reference to CreateContext
         self.create_context = create_context
         self.project_settings = project_settings
+        self.system_settings = system_settings
 
         # Creator is running in headless mode (without UI elemets)
         # - we may use UI inside processing this attribute should be checked
@@ -634,33 +632,22 @@ class Creator(BaseCreator):
             str: Path to staging dir.
         """
         create_ctx = self.create_context
-        asset_name = (
-            instance.get("asset") or create_ctx.get_current_asset_name())
+        asset_name = instance.get("asset")
+        subset = instance.get("subset")
+
+        if not any([asset_name, subset]):
+            return
+
         project_name = create_ctx.get_current_project_name()
         task_name = instance.get("task")
 
-        ctx_data = {
-            "asset": asset_name,
-            "subset": instance["subset"],
-            "project": {
-                "name": project_name,
-                "code": self.project_anatomy.project_code
-            },
+        ctx_data = get_template_data_with_names(
+            project_name, asset_name, task_name, self.system_settings)
+        ctx_data.update({
+            "subset": subset,
             "host": self.host_name,
             "family": self.family
-        }
-
-        if task_name:
-            asset_doc = get_asset_by_name(
-                project_name,
-                asset_name
-            )
-            task_type = get_task_type(asset_doc, task_name)
-            if task_type:
-                ctx_data["task"] = {
-                    "name": task_name,
-                    "type": task_type
-                }
+        })
 
         template, persistence = self.get_staging_dir_profile(
             instance, ctx_data)
