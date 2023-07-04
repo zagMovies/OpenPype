@@ -12,7 +12,6 @@ from .anatomy import Anatomy
 from .tempdir import get_temp_dir
 
 from .stagingdir import (
-    get_staging_dir_config,
     get_staging_dir
 )
 

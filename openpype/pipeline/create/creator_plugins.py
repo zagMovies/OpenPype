@@ -640,7 +640,7 @@ class Creator(BaseCreator):
             task_name, subset, self.project_anatomy,
             project_settings=self.project_settings,
             system_settings=self.system_settings,
-            always_get_some_dir=False,
+            always_return_path=False,
             log=self.log
         )
 
