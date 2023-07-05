@@ -200,7 +200,7 @@ def get_staging_dir(
                 prefix=kwargs.get("prefix"),
                 suffix=kwargs.get("suffix"),
             ),
-            "stagingDirPersistent": False
+            "stagingDirPersistence": False
         }
     elif not staging_dir_config:
         return None
@@ -209,5 +209,5 @@ def get_staging_dir(
         "stagingDir": StringTemplate.format_template(
             staging_dir_config["template"], ctx_data
         ),
-        "stagingDirPersistent": staging_dir_config["persistence"]
+        "stagingDirPersistence": staging_dir_config["persistence"]
     }
