@@ -22,9 +22,10 @@ from openpype.lib.transcoding import (
     should_convert_for_ffmpeg,
     convert_input_paths_for_ffmpeg
 )
-from openpype.pipeline import (
-    publish,
-    get_staging_dir
+from openpype.pipeline import get_temp_dir
+from openpype.pipeline.publish import (
+    KnownPublishError,
+    get_publish_instance_label,
 )
 
 from openpype.pipeline.publish.lib import add_repre_files_for_cleanup
@@ -207,7 +208,7 @@ class ExtractReview(pyblish.api.InstancePlugin):
         return filtered_defs
 
     def main_process(self, instance):
-        instance_label = publish.get_publish_instance_label(instance)
+        instance_label = get_publish_instance_label(instance)
         self.log.debug("Processing instance \"{}\"".format(instance_label))
         profile_outputs = self._get_outputs_for_instance(instance)
         if not profile_outputs:
@@ -271,7 +272,7 @@ class ExtractReview(pyblish.api.InstancePlugin):
             #   - change staging dir of source representation
             #   - must be set back after output definitions processing
             if do_convert:
-                new_staging_dir = get_staging_dir(
+                new_staging_dir = get_temp_dir(
                     project_name=instance.context.data["projectName"],
                     make_local=True,
                     prefix="op_transcoding_"
@@ -824,12 +825,12 @@ class ExtractReview(pyblish.api.InstancePlugin):
                 is done.
 
         Raises:
-            publish.KnownPublishError: if more than one collection is obtained.
+            KnownPublishError: if more than one collection is obtained.
         """
 
         collections = clique.assemble(files)[0]
         if len(collections) != 1:
-            raise publish.KnownPublishError(
+            raise KnownPublishError(
                 "Multiple collections {} found.".format(collections))
 
         col = collections[0]
@@ -852,7 +853,7 @@ class ExtractReview(pyblish.api.InstancePlugin):
             hole_fpath = os.path.join(staging_dir, col_format % hole_frame)
             src_fpath = os.path.join(staging_dir, col_format % src_frame)
             if not os.path.isfile(src_fpath):
-                raise publish.KnownPublishError(
+                raise KnownPublishError(
                     "Missing previously detected file: {}".format(src_fpath))
 
             speedcopy.copyfile(src_fpath, hole_fpath)

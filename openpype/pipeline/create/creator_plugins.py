@@ -7,7 +7,6 @@ from abc import (
     abstractmethod,
     abstractproperty
 )
-
 import six
 
 from openpype.settings import get_system_settings, get_project_settings
@@ -19,15 +18,10 @@ from openpype.pipeline.plugin_discover import (
     deregister_plugin,
     deregister_plugin_path
 )
-from openpype.pipeline import (
-    get_staging_dir_profile as _get_staging_dir_profile
-)
-from openpype.client import (
-    get_asset_by_name
-)
-from openpype.pipeline.template_data import get_task_type
+from openpype.pipeline import get_staging_dir
 
 from .subset_name import get_subset_name
+from .utils import get_next_versions_for_instances
 from .legacy_create import LegacyCreator
 
 
@@ -209,6 +203,7 @@ class BaseCreator:
         # Reference to CreateContext
         self.create_context = create_context
         self.project_settings = project_settings
+        self.system_settings = system_settings
 
         # Creator is running in headless mode (without UI elemets)
         # - we may use UI inside processing this attribute should be checked
@@ -490,6 +485,27 @@ class BaseCreator:
             thumbnail_path
         )
 
+    def get_next_versions_for_instances(self, instances):
+        """Prepare next versions for instances.
+
+        This is helper method to receive next possible versions for instances.
+        It is using context information on instance to receive them, 'asset'
+        and 'subset'.
+
+        Output will contain version by each instance id.
+
+        Args:
+            instances (list[CreatedInstance]): Instances for which to get next
+                versions.
+
+        Returns:
+            Dict[str, int]: Next versions by instance id.
+        """
+
+        return get_next_versions_for_instances(
+            self.create_context.project_name, instances
+        )
+
 
 class Creator(BaseCreator):
     """Creator that has more information for artist to show in UI.
@@ -618,56 +634,57 @@ class Creator(BaseCreator):
         """
         return self.pre_create_attr_defs
 
-    def get_staging_dir_profile(self, instance, task_type=None):
-        """Get staging directory profile.
+    def apply_staging_dir(self, instance):
+        """Apply staging dir with persistence to instance's transient data.
 
-        Arguments:
-            instance (CreatedInstance): Instance for which we want to get
-                staging dir.
-            task_type (str): Task type. If not set it will be queried from
-        Returns:
-            Dict or None: Data with template and persistance flag or None
-        Raises:
-            ValueError - if misconfigured template should be used
-        """
-
-        # task can be optional in tray publisher
-        task_name = instance.get("task")
-        asset_name = instance.get("asset")
-        task_type = task_type or self.get_task_type(task_name, asset_name)
-
-        return _get_staging_dir_profile(
-            self.project_name,
-            self.host_name,
-            self.family,
-            task_name,
-            task_type,
-            instance["subset"],
-            project_settings=self.project_settings,
-            anatomy=self.project_anatomy, log=self.log
-        )
-
-    def get_task_type(self, task_name=None, asset_name=None):
-        """Get task type from task name.
+        Method is called on instance creation and on instance update.
 
         Args:
-            task_name (str)[optional]: Task name.
-            asset_name (str)[optional]: Asset name.
+            instance (CreatedInstance): Instance for which should be staging
+                dir applied.
 
         Returns:
-            str: Task type.
+            str: Path to staging dir.
         """
-        if not task_name:
+        create_ctx = self.create_context
+        asset_name = instance.get("asset")
+        subset = instance.get("subset")
+        if not any([asset_name, subset]):
             return None
 
-        create_context = self.create_context
-        asset_name = asset_name or create_context.get_current_asset_name()
-        project_name = create_context.get_current_project_name()
-        task_name = create_context.get_current_task_name()
+        version = instance.get("version")
+        if version is not None:
+            formatting_data = {"version": version}
 
-        asset_doc = get_asset_by_name(project_name, asset_name)
+        project_name = create_ctx.get_current_project_name()
+        host_name = create_ctx.host_name
+        task_name = instance.get("task")
 
-        return get_task_type(asset_doc, task_name)
+        dir_data = get_staging_dir(
+            project_name, asset_name, host_name,
+            self.family, task_name, subset, self.project_anatomy,
+            project_settings=self.project_settings,
+            system_settings=self.system_settings,
+            always_return_path=False,
+            log=self.log,
+            formatting_data=formatting_data,
+        )
+
+        if not dir_data:
+            return None
+
+        staging_dir_path = dir_data["stagingDir"]
+
+        if not os.path.exists(staging_dir_path):
+            os.makedirs(staging_dir_path)
+
+        instance.transient_data.update(dir_data)
+
+        self.log.info(
+            "Applied staging dir to instance: {}".format(staging_dir_path)
+        )
+
+        return staging_dir_path
 
 
 class HiddenCreator(BaseCreator):

@@ -12,7 +12,7 @@ import pyblish.api
 from openpype import resources, PACKAGE_DIR
 from openpype.pipeline import (
     publish,
-    get_staging_dir
+    get_temp_dir
 )
 from openpype.lib import (
     run_openpype_process,
@@ -233,7 +233,7 @@ class ExtractBurnin(publish.Extractor):
             #   - change staging dir of source representation
             #   - must be set back after output definitions processing
             if do_convert:
-                new_staging_dir = get_staging_dir(
+                new_staging_dir = get_temp_dir(
                     project_name=instance.context.data["projectName"],
                     make_local=True,
                     prefix="op_transcoding_"

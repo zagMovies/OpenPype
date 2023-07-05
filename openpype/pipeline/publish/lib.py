@@ -19,8 +19,7 @@ from openpype.settings import (
     get_system_settings,
 )
 from openpype.pipeline import (
-    get_staging_dir_profile,
-    get_instance_staging_dir as _get_instance_staging_dir
+    get_staging_dir
 )
 
 from openpype.pipeline.plugin_discover import DiscoverResult
@@ -685,7 +684,9 @@ def context_plugin_should_run(plugin, context):
 # deprecated: backward compatibility only
 # TODO: remove in the future
 def get_custom_staging_dir_info(*args, **kwargs):
-    tr_data = get_staging_dir_profile(*args, **kwargs)
+    from openpype.pipeline.stagingdir import get_staging_dir_config
+
+    tr_data = get_staging_dir_config(*args, **kwargs)
 
     if not tr_data:
         return None, None
@@ -693,10 +694,59 @@ def get_custom_staging_dir_info(*args, **kwargs):
     return tr_data["template"], tr_data["persistence"]
 
 
-# deprecated: backward compatibility only
-# TODO: remove in the future
 def get_instance_staging_dir(instance):
-    return _get_instance_staging_dir(instance)
+    """Unified way how staging dir is stored and created on instances.
+
+    First check if 'stagingDir' is already set in instance data.
+    In case there already is new tempdir will not be created.
+
+    Returns:
+        str: Path to staging dir
+    """
+    staging_dir = instance.data.get('stagingDir')
+
+    if staging_dir:
+        return staging_dir
+
+    anatomy_data = instance.data["anatomyData"]
+    formatting_data = copy.deepcopy(anatomy_data)
+
+    # anatomy data based variables
+    family = anatomy_data["family"]
+    subset = anatomy_data["subset"]
+    asset_name = anatomy_data["asset"]
+    project_name = anatomy_data["projectName"]
+    task = anatomy_data.get("task", {})
+
+    # context data based variables
+    host_name = instance.context.data["hostName"]
+    project_settings = instance.context.data["project_settings"]
+    system_settings = instance.context.data["system_settings"]
+    anatomy = instance.context.data["anatomy"]
+    current_file = instance.context.data.get("currentFile")
+
+    # add current file as workfile name into formatting data
+    if current_file:
+        workfile = os.path.basename(current_file)
+        workfile_name, _ = os.path.splitext(workfile)
+        formatting_data["workfile_name"] = workfile_name
+
+    dir_data = get_staging_dir(
+        project_name, asset_name, host_name, family,
+        task.get("name"), subset, anatomy,
+        project_settings=project_settings,
+        system_settings=system_settings,
+        formatting_data=formatting_data
+    )
+
+    staging_dir_path = dir_data["stagingDir"]
+
+    if not os.path.exists(staging_dir_path):
+        os.makedirs(staging_dir_path)
+
+    instance.data.update(dir_data)
+
+    return staging_dir_path
 
 
 def get_publish_repre_path(instance, repre, only_published=False):
@@ -738,7 +788,7 @@ def get_publish_repre_path(instance, repre, only_published=False):
 
     staging_dir = repre.get("stagingDir")
     if not staging_dir:
-        staging_dir = _get_instance_staging_dir(instance)
+        staging_dir = get_instance_staging_dir(instance)
 
     # Expand the staging dir path in case it's been stored with the root
     # template syntax
