@@ -101,6 +101,9 @@ class CreateWriteRender(napi.NukeWriteCreator):
 
             instance.transient_data["node"] = instance_node
 
+            # add staging dir to instance and apply it to node path knob
+            self.apply_staging_dir_node(instance)
+
             self._add_instance_to_context(instance)
 
             napi.set_node_data(
