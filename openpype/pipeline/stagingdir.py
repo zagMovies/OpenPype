@@ -13,10 +13,10 @@ STAGING_DIR_TEMPLATES = "staging_dir"
 
 
 def get_staging_dir_config(
-        project_name, host_name, family, task_name,
-        task_type, subset_name,
-        project_settings=None,
-        anatomy=None, log=None
+    project_name, host_name, family, task_name,
+    task_type, subset_name,
+    project_settings=None,
+    anatomy=None, log=None
 ):
     """Get matching staging dir profile.
 
@@ -118,11 +118,11 @@ def _validate_template_name(project_name, template_name, anatomy):
 
 
 def get_staging_dir(
-        project_name, asset_name, host_name,
-        family, task_name, subset, anatomy,
-        project_settings=None,
-        system_settings=None,
-        **kwargs
+    project_name, asset_name, host_name,
+    family, task_name, subset, anatomy,
+    project_settings=None,
+    system_settings=None,
+    **kwargs
 ):
     """Get staging dir data.
 
@@ -139,8 +139,8 @@ def get_staging_dir(
         task_name (str): Name of task.
         subset (str): Name of subset.
         anatomy (openpype.pipeline.Anatomy): Anatomy object.
-        project_settings (Dict[str, Any]): Prepared project settings.
-        system_settings (Dict[str, Any]): Prepared system settings.
+        project_settings (Optional[Dict[str, Any]]): Prepared project settings.
+        system_settings (Optional[Dict[str, Any]]): Prepared system settings.
         **kwargs: Arbitrary keyword arguments. See below.
 
     Keyword Arguments:
@@ -202,6 +202,8 @@ def get_staging_dir(
             ),
             "stagingDirPersistent": False
         }
+    elif not staging_dir_config:
+        return None
 
     return {
         "stagingDir": StringTemplate.format_template(

@@ -1,3 +1,4 @@
+import os
 import copy
 import collections
 
@@ -656,11 +657,12 @@ class Creator(BaseCreator):
             formatting_data = {"version": version}
 
         project_name = create_ctx.get_current_project_name()
+        host_name = create_ctx.host_name
         task_name = instance.get("task")
 
         dir_data = get_staging_dir(
-            project_name, asset_name, self.host_name, self.family,
-            task_name, subset, self.project_anatomy,
+            project_name, asset_name, host_name,
+            self.family, task_name, subset, self.project_anatomy,
             project_settings=self.project_settings,
             system_settings=self.system_settings,
             always_return_path=False,
