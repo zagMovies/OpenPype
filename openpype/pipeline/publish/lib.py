@@ -715,7 +715,7 @@ def get_instance_staging_dir(instance):
     family = anatomy_data["family"]
     subset = anatomy_data["subset"]
     asset_name = anatomy_data["asset"]
-    project_name = anatomy_data["projectName"]
+    project_name = anatomy_data["project"]["name"]
     task = anatomy_data.get("task", {})
 
     # context data based variables
