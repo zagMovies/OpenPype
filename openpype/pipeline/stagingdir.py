@@ -6,7 +6,10 @@ from openpype.lib import (
 from openpype.settings import get_project_settings
 from .anatomy import Anatomy
 from .tempdir import get_temp_dir
-from openpype.pipeline.template_data import get_template_data_with_names
+from openpype.pipeline.template_data import (
+    get_template_data,
+    get_template_data_with_names
+)
 
 
 STAGING_DIR_TEMPLATES = "staging_dir"
@@ -120,6 +123,7 @@ def _validate_template_name(project_name, template_name, anatomy):
 def get_staging_dir(
     project_name, asset_name, host_name,
     family, task_name, subset, anatomy,
+    project_doc=None, asset_doc=None,
     project_settings=None,
     system_settings=None,
     **kwargs
@@ -139,6 +143,8 @@ def get_staging_dir(
         task_name (str): Name of task.
         subset (str): Name of subset.
         anatomy (openpype.pipeline.Anatomy): Anatomy object.
+        project_doc (Optional[Dict[str, Any]]): Prepared project document.
+        asset_doc (Optional[Dict[str, Any]]): Prepared asset document.
         project_settings (Optional[Dict[str, Any]]): Prepared project settings.
         system_settings (Optional[Dict[str, Any]]): Prepared system settings.
         **kwargs: Arbitrary keyword arguments. See below.
@@ -171,8 +177,18 @@ def get_staging_dir(
             suffix=kwargs.get("suffix"),
         )
 
-    ctx_data = get_template_data_with_names(
-        project_name, asset_name, task_name, system_settings)
+    # first try to get template data from documents then from names
+    if all([project_doc, asset_doc]):
+        # making fewer queries to database
+        ctx_data = get_template_data(
+            project_doc, asset_doc, task_name, host_name, system_settings
+        )
+    else:
+        ctx_data = get_template_data_with_names(
+            project_name, asset_name, task_name, system_settings
+        )
+
+    # add additional data
     ctx_data.update({
         "subset": subset,
         "host": host_name,
@@ -180,6 +196,7 @@ def get_staging_dir(
     })
     ctx_data["root"] = anatomy.roots
 
+    # add additional data from kwargs
     if kwargs.get("formatting_data"):
         ctx_data.update(kwargs.get("formatting_data"))
 
