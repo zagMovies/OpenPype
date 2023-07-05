@@ -245,7 +245,7 @@ class NukeCreator(NewCreator):
 
         dir_path = self.get_staging_dir(instance)
         self.log.info("Staging Dir: {}".format(dir_path))
-        if dir_path:
+        if dir_path and not os.path.exists(original_path):
             new_path = os.path.join(dir_path, filename).replace("\\", "/")
             node["file"].setValue(new_path)
 
