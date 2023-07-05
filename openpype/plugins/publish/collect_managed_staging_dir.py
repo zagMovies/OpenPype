@@ -41,6 +41,6 @@ class CollectManagedStagingDir(pyblish.api.InstancePlugin):
                 "and persistence is set to `{}`"
             ).format(
                 staging_dir_path,
-                instance.data["stagingDirPersistence"]
+                instance.data.get("stagingDirPersistence")
             )
         )

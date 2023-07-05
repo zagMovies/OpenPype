@@ -715,10 +715,12 @@ def get_instance_staging_dir(instance):
     family = anatomy_data["family"]
     subset = anatomy_data["subset"]
     asset_name = anatomy_data["asset"]
-    project_name = anatomy_data["projectName"]
+    project_name = anatomy_data["project"]["name"]
     task = anatomy_data.get("task", {})
 
     # context data based variables
+    project_entity = instance.context.data["projectEntity"]
+    asset_entity = instance.context.data["assetEntity"]
     host_name = instance.context.data["hostName"]
     project_settings = instance.context.data["project_settings"]
     system_settings = instance.context.data["system_settings"]
@@ -734,6 +736,7 @@ def get_instance_staging_dir(instance):
     dir_data = get_staging_dir(
         project_name, asset_name, host_name, family,
         task.get("name"), subset, anatomy,
+        project_doc=project_entity, asset_doc=asset_entity,
         project_settings=project_settings,
         system_settings=system_settings,
         formatting_data=formatting_data
