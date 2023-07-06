@@ -152,7 +152,6 @@ class CollectNukeWrites(pyblish.api.InstancePlugin,
                 instance.data[key] = creator_attributes[key]
 
             # Farm rendering
-            instance.data["transfer"] = False
             instance.data["farm"] = True
             self.log.info("Farm rendering ON ...")
 
