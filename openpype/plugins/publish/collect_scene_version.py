@@ -11,7 +11,7 @@ class CollectSceneVersion(pyblish.api.ContextPlugin):
         version (int, optional): version number of the publish
     """
 
-    order = pyblish.api.CollectorOrder
+    order = pyblish.api.CollectorOrder - 0.3
     label = 'Collect Scene Version'
     # configurable in Settings
     hosts = [
@@ -55,6 +55,6 @@ class CollectSceneVersion(pyblish.api.ContextPlugin):
         version = get_version_from_path(filename)
         assert version, "Cannot determine version"
 
-        rootVersion = int(version)
-        context.data['version'] = rootVersion
+        root_version = int(version)
+        context.data['version'] = root_version
         self.log.info('Scene Version: %s' % context.data.get('version'))

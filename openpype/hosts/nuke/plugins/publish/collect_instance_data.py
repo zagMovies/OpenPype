@@ -5,7 +5,7 @@ import pyblish.api
 class CollectInstanceData(pyblish.api.InstancePlugin):
     """Collect all nodes with Avalon knob."""
 
-    order = pyblish.api.CollectorOrder - 0.49
+    order = pyblish.api.CollectorOrder - 0.29
     label = "Collect Instance Data"
     hosts = ["nuke", "nukeassist"]
 
