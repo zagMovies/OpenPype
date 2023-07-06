@@ -634,7 +634,7 @@ class Creator(BaseCreator):
         """
         return self.pre_create_attr_defs
 
-    def apply_staging_dir(self, instance):
+    def apply_staging_dir(self, instance, make_path=True):
         """Apply staging dir with persistence to instance's transient data.
 
         Method is called on instance creation and on instance update.
@@ -642,6 +642,8 @@ class Creator(BaseCreator):
         Args:
             instance (CreatedInstance): Instance for which should be staging
                 dir applied.
+            make_path (bool): If `True` and path does not exist it will be
+                created. Set to `True` by default.
 
         Returns:
             str: Path to staging dir.
@@ -675,7 +677,7 @@ class Creator(BaseCreator):
 
         staging_dir_path = dir_data["stagingDir"]
 
-        if not os.path.exists(staging_dir_path):
+        if not os.path.exists(staging_dir_path) and make_path:
             os.makedirs(staging_dir_path)
 
         instance.transient_data.update(dir_data)
