@@ -101,6 +101,8 @@ install_requires = [
     "speedcopy",
     "googleapiclient",
     "httplib2",
+    "unidecode",
+    "semver",
     # Harmony implementation
     "filecmp",
     "dns",
